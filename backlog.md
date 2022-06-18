@@ -1,0 +1,7 @@
+- Throw error when no requestId in presign
+- SSE
+- use DDB to track status instead of file based stuff
+- use DDB to count and limit 200 max files per request
+- Add lambda to generate request uuid
+- TTL of DDB and S3
+- 1 request per IP, rate limit
