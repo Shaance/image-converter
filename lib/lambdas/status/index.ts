@@ -9,7 +9,10 @@ const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region: region })
 
-type ConversionStatus = "PROCESSING" | "DONE"
+enum ConversionStatus {
+  PROCESSING = "PROCESSING",
+  DONE = "DONE"
+}
 
 interface ConversionStatusDetail {
   status: ConversionStatus,
@@ -30,14 +33,14 @@ async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
   const archiveNb = listObjectResponse.KeyCount
   if (!!archiveNb && archiveNb === 1) {
     return {
-      status: "DONE"
+      status: ConversionStatus.DONE
     }
   }
 
   prefix = prefix.replace("Archives", "Converted")
   const convertedImagesNb = (await listObjects(prefix)).KeyCount
   return {
-    status: "PROCESSING",
+    status: ConversionStatus.PROCESSING,
     processed: convertedImagesNb
   }
 }
