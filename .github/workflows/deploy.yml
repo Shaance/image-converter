@@ -1,0 +1,35 @@
+name: Deploy heic image converter infrastructure
+
+on:
+ push:
+   branches: [main]
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 16
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+      - name: Installing depedencies
+        run: npm i
+      - name: Installing converter lambda dependencies
+        run: npm i --prefix ./lib/lambdas/converter
+      - name: Installing pre-sign lambda dependencies
+        run: npm i --prefix ./lib/lambdas/pre-sign
+      - name: Installing status lambda dependencies
+        run: npm i --prefix ./lib/lambdas/status
+      - name: Installing zipper lambda dependencies
+        run: npm i --prefix ./lib/lambdas/zipper
+      - name: Run the tests
+        run: npm test
+      - name: Deploy
+        run: npm run deploy
