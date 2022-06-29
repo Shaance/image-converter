@@ -26,8 +26,6 @@ export class HeicToJpgStack extends Stack {
       cors: [{
         allowedHeaders: ["*"],
         allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
-        // allowCredentials: true,
-        // allowOrigins: ['http://localhost:3000'],
         allowedOrigins: api_gateway.Cors.ALL_ORIGINS,
       }],
       lifecycleRules: [{
@@ -39,7 +37,7 @@ export class HeicToJpgStack extends Stack {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
       handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/pre-sign'),
       environment: {
         "BUCKET_NAME": bucket.bucketName,
@@ -51,7 +49,7 @@ export class HeicToJpgStack extends Stack {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
       handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/status'),
       environment: {
         "BUCKET_NAME": bucket.bucketName,
@@ -63,7 +61,7 @@ export class HeicToJpgStack extends Stack {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
       handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logRetention: logs.RetentionDays.ONE_WEEK,
       code: lambda.Code.fromAsset(lambdasPath + '/converter'),
       environment: {
         "REGION": props?.env?.region as string
@@ -76,7 +74,7 @@ export class HeicToJpgStack extends Stack {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
       handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_MONTH,
+      logRetention: logs.RetentionDays.ONE_WEEK,
       code: lambda.Code.fromAsset(lambdasPath + '/zipper'),
       environment: {
         "REGION": props?.env?.region as string
@@ -90,8 +88,6 @@ export class HeicToJpgStack extends Stack {
       defaultCorsPreflightOptions: {
         allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
         allowMethods: ['POST'],
-        // allowCredentials: true,
-        // allowOrigins: ['http://localhost:3000'],
         allowOrigins: api_gateway.Cors.ALL_ORIGINS,
       },
     });
