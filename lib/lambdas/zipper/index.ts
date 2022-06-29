@@ -18,6 +18,17 @@ const region = process.env.REGION as string;
 const s3Client = new S3Client({ region });
 const totalFilesCache = new Map<string, number>();
 
+function toLambdaOutput(statusCode: number, body: any) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    isBase64Encoded: false
+  };
+}
+
 async function getObjectFrom(bucket: string, key: string): Promise<GetObjectCommandOutput> {
   return s3Client.send(new GetObjectCommand({
     Bucket: bucket,
@@ -26,7 +37,6 @@ async function getObjectFrom(bucket: string, key: string): Promise<GetObjectComm
 }
 
 async function listObjects(bucket: string, prefix: string): Promise<ListObjectsV2CommandOutput> {
-  console.log(`Listing with prefix ${prefix}`)
   return s3Client.send(new ListObjectsV2Command({
     Bucket: bucket,
     Prefix: prefix,
@@ -40,27 +50,16 @@ async function getMetadataFrom(bucket: string, key: string): Promise<HeadObjectC
   }))
 }
 
-async function toArrayBuffer(stream: Readable): Promise<Buffer> {
+async function toArrayBuffer(stream: Stream): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = []
-    stream.on('data', chunk => chunks.push(chunk))
-    stream.once('end', () => resolve(Buffer.concat(chunks)))
-    stream.once('error', reject)
-  })
-}
-
-async function stream2buffer(stream: Stream): Promise<Buffer> {
-  return new Promise<Buffer>((resolve, reject) => {
-    const _buf = Array<any>();
-    stream.on("data", chunk => _buf.push(chunk));
-    stream.on("end", () => resolve(Buffer.concat(_buf)));
-    stream.on("error", err => reject(`error converting stream - ${err}`));
-
+    const chunks: Buffer[] = [];
+    stream.on("data", chunk => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", err => reject(`Error converting stream - ${err}`));
   });
 }
 
 async function putObjectTo(bucket: string, key: string, body: Buffer): Promise<PutObjectCommandOutput> {
-  console.log(`target key ${key}`)
   return s3Client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -86,13 +85,11 @@ async function archive(bucket: string, key: string): Promise<Buffer> {
   } else {
     console.log(`${prefix} not cached yet`)
     const metadataObject = await getMetadataFrom(bucket, key)
-    console.log(metadataObject)
     totalFiles = Number(metadataObject.Metadata!["total-files"]);
     totalFilesCache.set(prefix, totalFiles)
   }
 
   const listObjResult = await listObjects(bucket, prefix)
-  console.log(listObjResult)
   console.log(`Metadata totalFiles: ${totalFiles}, keyCount: ${listObjResult.KeyCount}`)
   if (!listObjResult.KeyCount || listObjResult.KeyCount as number !== totalFiles) {
     return Promise.reject("Nothing to archive");
@@ -102,12 +99,11 @@ async function archive(bucket: string, key: string): Promise<Buffer> {
   console.time('archive')
   await Promise.all(listObjResult.Contents!!.map(c => addToZip(zip, bucket, c.Key as string)));
   console.timeEnd('archive')
-  return stream2buffer(zip.generateNodeStream())
+  return toArrayBuffer(zip.generateNodeStream())
 }
 
 export const handler = async function (event: S3Event) {
-
-  await Promise.all(event.Records.map(async (record) => {
+  return await Promise.all(event.Records.map(async (record) => {
     console.log(record.s3);
     const bucket = record.s3.bucket.name;
     const key = record.s3.object.key;
@@ -118,14 +114,11 @@ export const handler = async function (event: S3Event) {
     await putObjectTo(bucket, targetKey, archiveBuffer);
     console.timeEnd("Uploading")
   }))
-    .catch(err => console.log(err))
-
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "text/plain"
-    },
-    body: JSON.stringify("ok"),
-    isBase64Encoded: false
-  };
+    .then(() => {
+      return toLambdaOutput(200, "Finished zipping")
+    })
+    .catch(err => {
+      console.log(err);
+      return toLambdaOutput(500, "Error while zipping")
+    })
 }

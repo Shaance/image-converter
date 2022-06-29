@@ -67,7 +67,7 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
 
     const s3Client = new S3Client({ region: region })
 
-    // TODO pagination
+    // soft limit to 50 total files, will never need pagination
     const putParams = {
       Bucket: bucketName,
       Key: `OriginalImages/${requestId}/${uuidv4()}${extension}`,
