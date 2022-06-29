@@ -27,7 +27,6 @@ async function listObjects(prefix: string): Promise<ListObjectsV2CommandOutput> 
 async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
   let prefix = `Archives/${requestId}`
   let listObjectResponse = await listObjects(prefix)
-  console.log(prefix, listObjectResponse)
   const archiveNb = listObjectResponse.KeyCount
   if (!!archiveNb && archiveNb === 1) {
     return {
@@ -43,19 +42,28 @@ async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
   }
 }
 
-export const handler = async (event: StatusAPIGatewayProxyEvent) => {
-  console.log(event)
-  let { requestId } = JSON.parse(event.body);
-  const status = await getStatus(requestId)
-
+function toLambdaOutput(statusCode: number, body: any) {
   return {
-    statusCode: 200,
+    statusCode,
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
     },
-    body: JSON.stringify(status),
+    body: JSON.stringify(body),
     isBase64Encoded: false
+  };
+}
+
+export const handler = async (event: StatusAPIGatewayProxyEvent) => {
+  console.log(event)
+  let { requestId } = JSON.parse(event.body);
+
+  if (!requestId) {
+    return toLambdaOutput(400, "request body should have requestId field");  
   }
+
+  const status = await getStatus(requestId)
+
+  return toLambdaOutput(200, status);
 }
