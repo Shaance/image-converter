@@ -13,6 +13,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Readable, Stream } from "stream";
 import * as JSZip from "jszip";
+import { add } from "date-fns";
 
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region });
@@ -63,7 +64,10 @@ async function putObjectTo(bucket: string, key: string, body: Buffer): Promise<P
   return s3Client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
-    Body: body
+    Body: body,
+    Expires: add(new Date(), {
+      hours: 1
+    })
   }))
 }
 
