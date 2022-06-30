@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
+import { add } from 'date-fns';
 
 const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
@@ -76,6 +77,9 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
         "original-name": nameWithoutExtension,
         "target-mime": targetMime
       },
+      Expires: add(new Date(), {
+        hours: 1
+      })
     }
 
     const getParams = {
