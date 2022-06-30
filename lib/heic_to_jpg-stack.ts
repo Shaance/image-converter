@@ -133,6 +133,9 @@ export class HeicToJpgStack extends Stack {
       requestModels: {
         "application/json": statusApiModel,
       },
+      requestValidatorOptions: {
+        validateRequestBody: true
+      }
     })
 
     bucket.grantReadWrite(presignLambda);
