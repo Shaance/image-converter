@@ -9,8 +9,24 @@ import {
   Duration,
   RemovalPolicy,
 } from 'aws-cdk-lib';
+import { JsonSchemaType, LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+
+function getStatusApiModel(scope: Construct, api: LambdaRestApi) {
+   return new api_gateway.Model(scope, "model-validator", {
+    restApi: api,
+    contentType: "application/json",
+    modelName: "statusApiModel",
+    schema: {
+      type: JsonSchemaType.OBJECT,
+      required: ["requestId"],
+      properties: {
+        requestId: { type: JsonSchemaType.STRING },
+      },
+    },
+  });
+}
 
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -92,7 +108,7 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    new api_gateway.LambdaRestApi(this, 'StatusAPI', {
+    const statusApi = new api_gateway.LambdaRestApi(this, 'StatusAPI', {
       handler: statusLambda,
       defaultCorsPreflightOptions: {
         allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
@@ -100,6 +116,23 @@ export class HeicToJpgStack extends Stack {
         allowOrigins: api_gateway.Cors.ALL_ORIGINS,
       },
     });
+
+    const statusApiModel = getStatusApiModel(this, statusApi)
+    const statusLambdaIntegration = new api_gateway.LambdaIntegration(statusLambda)
+    statusApi.root.addMethod("POST", statusLambdaIntegration, {
+      requestValidator: new api_gateway.RequestValidator(
+        this,
+        "body-validator",
+        {
+          restApi: statusApi,
+          requestValidatorName: "body-validator",
+          validateRequestBody: true,
+        }
+      ),
+      requestModels: {
+        "application/json": statusApiModel,
+      },
+    })
 
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);

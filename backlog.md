@@ -1,7 +1,10 @@
-- Throw error when no requestId in presign
-- SSE
+- use s3 SSE encryption
 - use DDB to track status instead of file based stuff
 - use DDB to count and limit 200 max files per request
-- Add lambda to generate request uuid
+- Add lambda to generate request uuid and store it somehow
+- make presign lambda check if requestId is a valid one
+- change getStatus to a GET request with query param
 - TTL of DDB and S3
 - 1 request per IP, rate limit
+- CORS to localhost:3000 (look at strategies here) + own url when hosted
+- requests validation from API gateway

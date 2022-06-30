@@ -61,12 +61,6 @@ function toLambdaOutput(statusCode: number, body: any) {
 export const handler = async (event: StatusAPIGatewayProxyEvent) => {
   console.log(event)
   let { requestId } = JSON.parse(event.body);
-
-  if (!requestId) {
-    return toLambdaOutput(400, "request body should have requestId field");  
-  }
-
   const status = await getStatus(requestId)
-
   return toLambdaOutput(200, status);
 }
