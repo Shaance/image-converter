@@ -15,6 +15,17 @@ const convert = require("heic-convert")
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region })
 
+function toLambdaOutput(statusCode: number, body: any) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    isBase64Encoded: false
+  };
+}
+
 function toHeicConvertTargetFormat(mime: string) {
   if (mime === "image/jpeg") {
     return "JPEG"
@@ -87,16 +98,14 @@ async function convertFromS3(record: S3EventRecordDetail) {
 
 
 export const handler = async function (event: S3Event) {
-  await Promise.all(event.Records.map((record) => {
-    return convertFromS3(record.s3)
-  }))
+  try {
+    await Promise.all(event.Records.map((record) => {
+      return convertFromS3(record.s3)
+    }))
+  } catch (err) {
+    console.log(err)
+    return toLambdaOutput(500, `Error during conversion ${err}`)
+  }
 
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "text/plain"
-    },
-    body: JSON.stringify("ok"),
-    isBase64Encoded: false
-  };
+  return toLambdaOutput(200, "conversion done")
 }
