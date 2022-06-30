@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Readable } from "stream";
 import { v4 as uuidv4 } from 'uuid';
+import { add } from 'date-fns'
 
 const convert = require("heic-convert")
 
@@ -40,7 +41,9 @@ async function putObjectTo(bucket: string, key: string, body: Buffer, totalFiles
       "total-files": totalFiles,
       "original-name": originalName,
     },
-    // Expires: TODO
+    Expires: add(new Date(), {
+      hours: 1
+    })
   }))
 }
 
