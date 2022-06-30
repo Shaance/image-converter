@@ -9,24 +9,8 @@ import {
   Duration,
   RemovalPolicy,
 } from 'aws-cdk-lib';
-import { JsonSchemaType, LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
-
-function getStatusApiModel(scope: Construct, api: LambdaRestApi) {
-   return new api_gateway.Model(scope, "model-validator", {
-    restApi: api,
-    contentType: "application/json",
-    modelName: "statusApiModel",
-    schema: {
-      type: JsonSchemaType.OBJECT,
-      required: ["requestId"],
-      properties: {
-        requestId: { type: JsonSchemaType.STRING },
-      },
-    },
-  });
-}
 
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -113,29 +97,25 @@ export class HeicToJpgStack extends Stack {
       proxy: false,
       defaultCorsPreflightOptions: {
         allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
-        allowMethods: ['POST'],
+        allowMethods: ['GET'],
         allowOrigins: api_gateway.Cors.ALL_ORIGINS,
       },
     });
 
-    const statusApiModel = getStatusApiModel(this, statusApi)
+    // const statusApiModel = getStatusApiModel(this, statusApi)
     const statusLambdaIntegration = new api_gateway.LambdaIntegration(statusLambda)
-    statusApi.root.addMethod("POST", statusLambdaIntegration, {
+    statusApi.root.addMethod("GET", statusLambdaIntegration, {
       requestValidator: new api_gateway.RequestValidator(
         this,
-        "body-validator",
+        "query-string-validator",
         {
           restApi: statusApi,
-          requestValidatorName: "body-validator",
-          validateRequestBody: true,
+          validateRequestParameters: true
         }
       ),
-      requestModels: {
-        "application/json": statusApiModel,
+      requestParameters: {
+        "method.request.querystring.requestId": true,
       },
-      requestValidatorOptions: {
-        validateRequestBody: true
-      }
     })
 
     bucket.grantReadWrite(presignLambda);
