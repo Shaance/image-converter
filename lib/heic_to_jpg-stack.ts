@@ -102,7 +102,6 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    // const statusApiModel = getStatusApiModel(this, statusApi)
     const statusLambdaIntegration = new api_gateway.LambdaIntegration(statusLambda)
     statusApi.root.addMethod("GET", statusLambdaIntegration, {
       requestValidator: new api_gateway.RequestValidator(
@@ -116,6 +115,16 @@ export class HeicToJpgStack extends Stack {
       requestParameters: {
         "method.request.querystring.requestId": true,
       },
+      methodResponses: [
+        {
+          statusCode: '400',
+          responseParameters: {
+            'method.response.header.Content-Type': true,
+            'method.response.header.Access-Control-Allow-Origin': true,
+            'method.response.header.Access-Control-Allow-Credentials': true
+          },
+        }
+      ]
     })
 
     bucket.grantReadWrite(presignLambda);
