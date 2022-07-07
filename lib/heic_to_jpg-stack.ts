@@ -5,12 +5,22 @@ import {
   aws_logs as logs,
   aws_s3 as s3,
   aws_s3_notifications as s3n,
+  aws_dynamodb as ddb,
   aws_apigateway as api_gateway,
   Duration,
   RemovalPolicy,
 } from 'aws-cdk-lib';
+import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+
+function createRequestsTable(scope: Construct): Table {
+  return new ddb.Table(scope, 'RequestsTable', {
+    partitionKey: { name: 'requestId', type: ddb.AttributeType.STRING },
+    billingMode: ddb.BillingMode.PAY_PER_REQUEST,
+    encryption: ddb.TableEncryption.AWS_MANAGED,
+  });
+}
 
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -146,5 +156,7 @@ export class HeicToJpgStack extends Stack {
         prefix: 'Converted'
       }
     )
+
+    createRequestsTable(this)
   }
 }
