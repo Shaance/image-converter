@@ -25,7 +25,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
   const params = {
     TableName: tableName,
     Item: {
-      primaryKey: { S: requestId },
+      requestId: { S: requestId },
       modifiedAt: { S: new Date().toISOString() }
     },
   };
