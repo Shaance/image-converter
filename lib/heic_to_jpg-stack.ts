@@ -19,6 +19,8 @@ function createRequestsTable(scope: Construct): Table {
     partitionKey: { name: 'requestId', type: ddb.AttributeType.STRING },
     billingMode: ddb.BillingMode.PAY_PER_REQUEST,
     encryption: ddb.TableEncryption.AWS_MANAGED,
+    // timeToLiveAttribute: TODO setup TTL
+    // TODO removal policy
   });
 }
 
@@ -42,6 +44,22 @@ export class HeicToJpgStack extends Stack {
         expiration: Duration.days(1)
       }]
     });
+
+    const table = createRequestsTable(this)
+
+    const requestsLambda = new lambda.Function(this, "RequestsLambda", {
+      runtime: lambda.Runtime.NODEJS_16_X,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'index.handler',
+      logRetention: logs.RetentionDays.ONE_DAY,
+      code: lambda.Code.fromAsset(lambdasPath + '/requests'),
+      environment: {
+        "TABLE_NAME": table.tableName,
+        "REGION": props?.env?.region as string,
+      },
+    });
+
+    table.grantReadWriteData(requestsLambda)
 
     const presignLambda = new lambda.Function(this, "PreSignLambda", {
       runtime: lambda.Runtime.NODEJS_16_X,
@@ -102,6 +120,15 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
+    new api_gateway.LambdaRestApi(this, 'RequestsAPI', {
+      handler: requestsLambda,
+      defaultCorsPreflightOptions: {
+        allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
+        allowMethods: ['GET'],
+        allowOrigins: api_gateway.Cors.ALL_ORIGINS,
+      },
+    });
+
     const statusApi = new api_gateway.LambdaRestApi(this, 'StatusAPI', {
       handler: statusLambda,
       proxy: false,
@@ -156,7 +183,5 @@ export class HeicToJpgStack extends Stack {
         prefix: 'Converted'
       }
     )
-
-    createRequestsTable(this)
   }
 }
