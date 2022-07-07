@@ -26,7 +26,13 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
     TableName: tableName,
     Item: {
       requestId: { S: requestId },
-      modifiedAt: { S: new Date().toISOString() }
+      filesToConvert: { N: "1" }, // TODO query param from event + validation
+      presignedUrls: { N: "0" },
+      uploadedFiles: { N: "0" },
+      convertedFiles: { N: "0" },
+      state: { S: "CREATED" },
+      createdAt: { S: new Date().toISOString() },
+      modifiedAt: { S: new Date().toISOString() },
     },
   };
 
