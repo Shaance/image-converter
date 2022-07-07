@@ -29,6 +29,8 @@ jobs:
         run: npm i --prefix ./lib/lambdas/status
       - name: Installing zipper lambda dependencies
         run: npm i --prefix ./lib/lambdas/zipper
+      - name: Installing requests lambda dependencies
+        run: npm i --prefix ./lib/lambdas/requests
       - name: Run the tests
         run: npm test
       - name: Deploy
