@@ -17,8 +17,29 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
+function validateRequest(event: APIGatewayProxyEvent) {
+  // API gateway should make sure it's never false
+  const { nbFiles } = JSON.parse(event.body!)
+
+  if (isNaN(+nbFiles)) {
+    return toLambdaOutput(400, "nbFiles should be a number")
+  }
+
+  if (nbFiles < 1) {
+    return toLambdaOutput(400, "nbFiles should be at least 1 ")
+  }
+
+  if (nbFiles > 50) {
+    return toLambdaOutput(50, "nbFiles can't be higher than 50 ")
+  }
+
+  return
+}
+
 export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
+  validateRequest(event)
+  const { nbFiles } = JSON.parse(event.body!)
   const requestId = uuidv4()
   console.log(`Generated uuid ${requestId}`)
   
@@ -26,7 +47,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
     TableName: tableName,
     Item: {
       requestId: { S: requestId },
-      filesToConvert: { N: "1" }, // TODO query param from event + validation
+      nbFiles: { N: nbFiles },
       presignedUrls: { N: "0" },
       uploadedFiles: { N: "0" },
       convertedFiles: { N: "0" },

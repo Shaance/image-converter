@@ -24,6 +24,17 @@ function createRequestsTable(scope: Construct): Table {
   });
 }
 
+function getGatewayLambdaResponseMethod() {
+  return {
+    statusCode: '400',
+    responseParameters: {
+      'method.response.header.Content-Type': true,
+      'method.response.header.Access-Control-Allow-Origin': true,
+      'method.response.header.Access-Control-Allow-Credentials': true
+    },
+  }
+}
+
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -143,7 +154,7 @@ export class HeicToJpgStack extends Stack {
     statusApi.root.addMethod("GET", statusLambdaIntegration, {
       requestValidator: new api_gateway.RequestValidator(
         this,
-        "query-string-validator",
+        "status-query-string-validator",
         {
           restApi: statusApi,
           validateRequestParameters: true
@@ -153,14 +164,25 @@ export class HeicToJpgStack extends Stack {
         "method.request.querystring.requestId": true,
       },
       methodResponses: [
+        getGatewayLambdaResponseMethod()
+      ]
+    })
+
+    const requestsLambdaIntegration = new api_gateway.LambdaIntegration(requestsLambda)
+    statusApi.root.addMethod("GET", requestsLambdaIntegration, {
+      requestValidator: new api_gateway.RequestValidator(
+        this,
+        "requests-query-string-validator",
         {
-          statusCode: '400',
-          responseParameters: {
-            'method.response.header.Content-Type': true,
-            'method.response.header.Access-Control-Allow-Origin': true,
-            'method.response.header.Access-Control-Allow-Credentials': true
-          },
+          restApi: statusApi,
+          validateRequestParameters: true
         }
+      ),
+      requestParameters: {
+        "method.request.querystring.nbFiles": true,
+      },
+      methodResponses: [
+        getGatewayLambdaResponseMethod()
       ]
     })
 
