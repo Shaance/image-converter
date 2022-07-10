@@ -19,8 +19,8 @@ function createRequestsTable(scope: Construct): Table {
     partitionKey: { name: 'requestId', type: ddb.AttributeType.STRING },
     billingMode: ddb.BillingMode.PAY_PER_REQUEST,
     encryption: ddb.TableEncryption.AWS_MANAGED,
+    removalPolicy: RemovalPolicy.DESTROY,
     // TODO setup TTL
-    // TODO removal policy
   });
 }
 
