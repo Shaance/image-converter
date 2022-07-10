@@ -133,6 +133,7 @@ export class HeicToJpgStack extends Stack {
 
     const requestsApi = new api_gateway.LambdaRestApi(this, 'RequestsAPI', {
       handler: requestsLambda,
+      proxy: false,
       defaultCorsPreflightOptions: {
         allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
         allowMethods: ['GET'],
