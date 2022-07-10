@@ -20,7 +20,7 @@ function createRequestsTable(scope: Construct): Table {
     billingMode: ddb.BillingMode.PAY_PER_REQUEST,
     encryption: ddb.TableEncryption.AWS_MANAGED,
     removalPolicy: RemovalPolicy.DESTROY,
-    // TODO setup TTL
+    timeToLiveAttribute: "expiresAt",
   });
 }
 

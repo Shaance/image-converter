@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { add } from "date-fns"
 
 const region = process.env.REGION as string;
 const tableName = process.env.TABLE_NAME as string;
@@ -54,6 +55,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
       state: { S: "CREATED" },
       createdAt: { S: new Date().toISOString() },
       modifiedAt: { S: new Date().toISOString() },
+      expiresAt: { S: add(new Date(), { days: 2 }).toISOString()}
     },
   };
 
