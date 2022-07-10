@@ -131,7 +131,7 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    new api_gateway.LambdaRestApi(this, 'RequestsAPI', {
+    const requestsApi = new api_gateway.LambdaRestApi(this, 'RequestsAPI', {
       handler: requestsLambda,
       defaultCorsPreflightOptions: {
         allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
@@ -169,12 +169,12 @@ export class HeicToJpgStack extends Stack {
     })
 
     const requestsLambdaIntegration = new api_gateway.LambdaIntegration(requestsLambda)
-    statusApi.root.addMethod("GET", requestsLambdaIntegration, {
+    requestsApi.root.addMethod("GET", requestsLambdaIntegration, {
       requestValidator: new api_gateway.RequestValidator(
         this,
         "requests-query-string-validator",
         {
-          restApi: statusApi,
+          restApi: requestsApi,
           validateRequestParameters: true
         }
       ),
