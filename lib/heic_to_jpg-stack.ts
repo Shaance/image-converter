@@ -1,3 +1,4 @@
+import { handler } from './lambdas/status/index';
 import {
   Stack,
   StackProps,
@@ -14,6 +15,7 @@ import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+import { LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
 
 function createRequestsTable(scope: Construct): Table {
   return new ddb.Table(scope, 'RequestsTable', {
@@ -36,7 +38,7 @@ function getGatewayLambdaResponseMethod() {
   }
 }
 
-function toGatewayApi(scope: Construct, apiName: string, lambdaFn: IFunction, allowMethods: string[], proxy = true) {
+function toGatewayApi(scope: Construct, apiName: string, lambdaFn: IFunction, allowMethods: string[], proxy = true): LambdaRestApi {
   return new api_gateway.LambdaRestApi(scope, apiName, {
     handler: lambdaFn,
     proxy,
@@ -46,6 +48,29 @@ function toGatewayApi(scope: Construct, apiName: string, lambdaFn: IFunction, al
       allowOrigins: api_gateway.Cors.ALL_ORIGINS,
     },
   });
+}
+
+function addMethodOnGatewayApi(scope: Construct, lambdaFn: IFunction, api: LambdaRestApi, restMethod: string, requestValidatorId: string, fields: string[]) {
+  const lambdaIntegration = new api_gateway.LambdaIntegration(lambdaFn)
+  const requestParameters = fields.reduce((params, field) => {
+    // @ts-ignore
+    params[`method.request.querystring.${field}`] = true
+    return params
+  }, {})
+  api.root.addMethod(restMethod, lambdaIntegration, {
+    requestValidator: new api_gateway.RequestValidator(
+      scope,
+      requestValidatorId,
+      {
+        restApi: api,
+        validateRequestParameters: true
+      }
+    ),
+    requestParameters,
+    methodResponses: [
+      getGatewayLambdaResponseMethod()
+    ]
+  })
 }
 
 export class HeicToJpgStack extends Stack {
@@ -139,41 +164,8 @@ export class HeicToJpgStack extends Stack {
     const requestsApi = toGatewayApi(this, 'RequestsAPI', requestsLambda, ['GET'], false)
     const statusApi = toGatewayApi(this, 'StatusAPI', statusLambda, ['GET'], false)
 
-    const statusLambdaIntegration = new api_gateway.LambdaIntegration(statusLambda)
-    statusApi.root.addMethod("GET", statusLambdaIntegration, {
-      requestValidator: new api_gateway.RequestValidator(
-        this,
-        "status-query-string-validator",
-        {
-          restApi: statusApi,
-          validateRequestParameters: true
-        }
-      ),
-      requestParameters: {
-        "method.request.querystring.requestId": true,
-      },
-      methodResponses: [
-        getGatewayLambdaResponseMethod()
-      ]
-    })
-
-    const requestsLambdaIntegration = new api_gateway.LambdaIntegration(requestsLambda)
-    requestsApi.root.addMethod("GET", requestsLambdaIntegration, {
-      requestValidator: new api_gateway.RequestValidator(
-        this,
-        "requests-query-string-validator",
-        {
-          restApi: requestsApi,
-          validateRequestParameters: true
-        }
-      ),
-      requestParameters: {
-        "method.request.querystring.nbFiles": true,
-      },
-      methodResponses: [
-        getGatewayLambdaResponseMethod()
-      ]
-    })
+    addMethodOnGatewayApi(this, statusLambda, statusApi, "GET", "status-query-string-validator", ["requestId"])
+    addMethodOnGatewayApi(this, requestsLambda, requestsApi, "GET", "requests-query-string-validator", ["nbFiles"])
 
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
