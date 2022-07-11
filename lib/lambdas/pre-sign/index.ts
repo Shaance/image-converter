@@ -41,6 +41,10 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> {
   const params = {
     TableName: tableName,
@@ -83,6 +87,7 @@ async function updatePresignUrlCount(requestId: string, retries = 10): Promise<U
     return await ddbClient.send(new UpdateItemCommand(params))
   } catch (err) {
     console.log(err)
+    await sleep(Math.random() * 25)
     return updatePresignUrlCount(requestId, retries - 1)
   }
 }
