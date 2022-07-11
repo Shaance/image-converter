@@ -24,11 +24,11 @@ function validateRequest(nbFiles: string) {
   }
 
   if (Number(nbFiles) < 1) {
-    return toLambdaOutput(400, "nbFiles should be at least 1 ")
+    return toLambdaOutput(400, "nbFiles should be at least 1")
   }
 
   if (Number(nbFiles) > 50) {
-    return toLambdaOutput(400, "nbFiles can't be higher than 50 ")
+    return toLambdaOutput(400, "nbFiles can't be higher than 50")
   }
 
   return
@@ -36,7 +36,8 @@ function validateRequest(nbFiles: string) {
 
 export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
-  const nbFiles = event.queryStringParameters?.nbFiles as string
+  // API gateway already validated nbFiles presence in queryString
+  const nbFiles = event.queryStringParameters!.nbFiles as string
   const errOutput = validateRequest(nbFiles)
   if (!!errOutput) {
     return errOutput
@@ -62,7 +63,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
 
   try {
     const data = await ddbClient.send(new PutItemCommand(params));
-    console.log("Success - item added or updated", data);
+    console.log("Success - item added", data);
   } catch (err) {
     // @ts-ignore
     console.log("Error", err.stack);
