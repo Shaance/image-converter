@@ -43,13 +43,12 @@ async function getObjectFrom(bucket: string, key: string): Promise<GetObjectComm
   }))
 }
 
-async function putObjectTo(bucket: string, key: string, body: Buffer, totalFiles: string, originalName: string): Promise<PutObjectCommandOutput> {
+async function putObjectTo(bucket: string, key: string, body: Buffer, originalName: string): Promise<PutObjectCommandOutput> {
   return s3Client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
     Body: body,
     Metadata: {
-      "total-files": totalFiles,
       "original-name": originalName,
     },
     Expires: add(new Date(), {
@@ -91,9 +90,8 @@ async function convertFromS3(record: S3EventRecordDetail) {
   });
   console.timeEnd(`Conversion-${conversionId}`)
   const targetKey = toNewKey(key, targetMime)
-  const totalFiles = object.Metadata!["total-files"];
   const originalName = object.Metadata!["original-name"];
-  await putObjectTo(bucket, targetKey, outputBuffer, totalFiles, originalName)
+  await putObjectTo(bucket, targetKey, outputBuffer, originalName)
 }
 
 

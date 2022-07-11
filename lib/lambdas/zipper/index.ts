@@ -104,9 +104,7 @@ async function archive(bucket: string, key: string, requestId: string): Promise<
   } else {
     console.log(`${prefix} not cached yet`)
     const ddbResponse = await getRequestItem(requestId)
-    console.log(ddbResponse)
     nbFiles = Number(ddbResponse.Item?.nbFiles.N as string)
-    console.log(nbFiles)
     totalFilesCache.set(prefix, nbFiles)
   }
 

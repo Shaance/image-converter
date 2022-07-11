@@ -47,7 +47,7 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
 }
 
 async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters) {
-  const { totalFiles, targetMime, requestId } = queryParams
+  const { targetMime, requestId } = queryParams
   
   if (!validTargetMimesSet.has(targetMime!)) {
     return toLambdaOutput(400, `${targetMime} targetMime is not supported, valid values are: ${validTargetMimes}`)
@@ -58,26 +58,13 @@ async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParam
     return toLambdaOutput(400, `requestId ${requestId} does not exist`)
   }
 
-  // TODO remove once client updated to retrieve requestId through requrests lambda
-  if (isNaN(+totalFiles!)) {
-    return toLambdaOutput(400, "totalFiles should be a number")
-  }
-
-  if (Number(totalFiles) < 1) {
-    return toLambdaOutput(400, "totalFiles should be at least 1")
-  }
-
-  if (Number(totalFiles) > 50) {
-    return toLambdaOutput(400, "totalFiles can't be higher than 50 ")
-  }
-
   return
 }
 
 export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
     console.log(event)
     const errOutput = await validateRequest(event.queryStringParameters!)
-    const { fileName, requestId, totalFiles, targetMime } = event.queryStringParameters!;
+    const { fileName, requestId, targetMime } = event.queryStringParameters!;
     
     if (!!errOutput) {
       return errOutput
@@ -92,7 +79,6 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
       Bucket: bucketName,
       Key: `OriginalImages/${requestId}/${uuidv4()}${extension}`,
       Metadata: {
-        "total-files": totalFiles as string,
         "original-name": nameWithoutExtension,
         "target-mime": targetMime as string
       },
