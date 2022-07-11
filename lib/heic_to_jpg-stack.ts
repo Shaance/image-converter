@@ -101,6 +101,7 @@ export class HeicToJpgStack extends Stack {
       handler: 'index.handler',
       logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/requests'),
+      timeout: Duration.seconds(10),
       environment: {
         "TABLE_NAME": table.tableName,
         "REGION": props?.env?.region as string,
@@ -139,7 +140,8 @@ export class HeicToJpgStack extends Stack {
       logRetention: logs.RetentionDays.ONE_WEEK,
       code: lambda.Code.fromAsset(lambdasPath + '/converter'),
       environment: {
-        "REGION": props?.env?.region as string
+        "REGION": props?.env?.region as string,
+        "TABLE_NAME": table.tableName,
       },
       timeout: Duration.seconds(30),
       memorySize: 1024
@@ -169,6 +171,7 @@ export class HeicToJpgStack extends Stack {
 
     table.grantReadWriteData(requestsLambda)
     table.grantReadWriteData(presignLambda)
+    table.grantReadWriteData(converterLambda)
     table.grantReadData(zipperLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
