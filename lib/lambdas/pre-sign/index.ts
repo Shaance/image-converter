@@ -162,6 +162,14 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
       getObjectSignedUrl,
       putObjectSignedUrl,
     }
-    await updatePresignUrlCount(requestId as string)
+
+    try {
+      await updatePresignUrlCount(requestId as string)
+    } catch (err) {
+      if (err === maximumUrlGenerated) {
+        return toLambdaOutput(400, { errMessage: "Maximum urls generated"});
+      }
+      return toLambdaOutput(500, { errMessage: "Internal Error"});
+    }
     return toLambdaOutput(200, responseBody);
 }
