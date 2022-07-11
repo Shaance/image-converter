@@ -40,7 +40,7 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
     Key: {
       requestId: { S: requestId },
     },
-    ProjectionExpression: "state", // any attribute would do
+    ProjectionExpression: "nbFiles", // any attribute would do
   };
   
   return ddbClient.send(new GetItemCommand(params))
