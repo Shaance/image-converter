@@ -6,6 +6,15 @@ import {
   PutObjectCommandOutput,
   GetObjectCommandOutput,
 } from '@aws-sdk/client-s3';
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  GetItemCommandInput,
+  GetItemCommandOutput,
+  UpdateItemCommand,
+  UpdateItemCommandInput,
+  UpdateItemCommandOutput,
+} from "@aws-sdk/client-dynamodb";
 import { Readable } from "stream";
 import { v4 as uuidv4 } from 'uuid';
 import { add } from 'date-fns'
@@ -14,6 +23,9 @@ const convert = require("heic-convert")
 
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region })
+const tableName = process.env.TABLE_NAME as string;
+const ddbClient = new DynamoDBClient({ region });
+const outOfRetries = "OutOfRetries"
 
 function toLambdaOutput(statusCode: number, body: any) {
   return {
@@ -24,6 +36,63 @@ function toLambdaOutput(statusCode: number, body: any) {
     body: JSON.stringify(body),
     isBase64Encoded: false
   };
+}
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getRequestItem(requestId: string, projectionExpression: string, consistentRead = false): Promise<GetItemCommandOutput> {
+  const params: GetItemCommandInput = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    ProjectionExpression: projectionExpression,
+    ConsistentRead: consistentRead
+  };
+  
+  return ddbClient.send(new GetItemCommand(params))
+}
+
+async function updateCount(requestId: string, countAttribute: string, retriesLeft = 10, delay = 25): Promise<UpdateItemCommandOutput> {
+  if (retriesLeft < 1) {
+    retriesLeft = 1
+  }
+  if (retriesLeft < 1) {
+    return Promise.reject(outOfRetries)
+  }
+
+  const requestItem = (await getRequestItem(requestId, "modifiedAt")).Item
+  const modifiedAt = requestItem?.modifiedAt.S
+
+  const params: UpdateItemCommandInput = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    UpdateExpression: "ADD #currentCount :n SET #updatedAt = :newChangeMadeAt",
+    ExpressionAttributeNames: {
+      "#currentCount" : countAttribute,
+      "#updatedAt" : "modifiedAt",
+    },
+    ExpressionAttributeValues: {
+      ":n" : { N: "1" },
+      ":newChangeMadeAt": { S: new Date().toISOString() },
+      ":modifiedAtFromItem": { S: modifiedAt as string },
+    },
+    ConditionExpression: "#updatedAt = :modifiedAtFromItem",
+  };
+
+  try {
+    return await ddbClient.send(new UpdateItemCommand(params))
+  } catch (err) {
+    console.log(err)
+    delay = delay * 0.8 + Math.random() * delay * 0.2
+    console.log(delay)
+    await sleep(delay)
+    return updateCount(requestId, countAttribute, retriesLeft - 1, delay * 2)
+  }
 }
 
 function toHeicConvertTargetFormat(mime: string) {
@@ -79,6 +148,8 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const conversionId = uuidv4()
   const bucket = record.bucket.name;
   const key = record.object.key;
+  const requestId = key.split('/')[1]
+  const uploadedCountPromise = updateCount(requestId, "uploadedFiles")
   const object = await getObjectFrom(bucket, key)
   const targetMime = object.Metadata!["target-mime"];
   const buffer = await toArrayBuffer(object.Body as Readable)
@@ -92,8 +163,9 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const targetKey = toNewKey(key, targetMime)
   const originalName = object.Metadata!["original-name"];
   await putObjectTo(bucket, targetKey, outputBuffer, originalName)
+  await uploadedCountPromise
+  await updateCount(requestId, "convertedFiles")
 }
-
 
 export const handler = async function (event: S3Event) {
   try {
