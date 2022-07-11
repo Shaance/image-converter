@@ -84,6 +84,7 @@ async function updateCount(requestId: string, countAttribute: string, retriesLef
       ":state": { S: "CONVERTING" },
     },
     ConditionExpression: "#updatedAt = :modifiedAtFromItem",
+    ReturnValues: "ALL_NEW"
   };
 
   try {
@@ -151,7 +152,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const bucket = record.bucket.name;
   const key = record.object.key;
   const requestId = key.split('/')[1]
-  const uploadedCountPromise = updateCount(requestId, "uploadedFiles")
+  await updateCount(requestId, "uploadedFiles")
   const object = await getObjectFrom(bucket, key)
   const targetMime = object.Metadata!["target-mime"];
   const buffer = await toArrayBuffer(object.Body as Readable)
@@ -165,8 +166,8 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const targetKey = toNewKey(key, targetMime)
   const originalName = object.Metadata!["original-name"];
   await putObjectTo(bucket, targetKey, outputBuffer, originalName)
-  await uploadedCountPromise
-  await updateCount(requestId, "convertedFiles")
+  const updatedItem = await updateCount(requestId, "convertedFiles")
+  console.log(updatedItem)
 }
 
 export const handler = async function (event: S3Event) {
