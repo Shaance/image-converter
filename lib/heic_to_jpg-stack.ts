@@ -107,8 +107,6 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    table.grantReadWriteData(requestsLambda)
-
     const presignLambda = new lambda.Function(this, "PreSignLambda", {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
@@ -122,7 +120,7 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    table.grantReadData(presignLambda)
+    
 
     const statusLambda = new lambda.Function(this, "StatusLambda", {
       runtime: lambda.Runtime.NODEJS_16_X,
@@ -156,7 +154,8 @@ export class HeicToJpgStack extends Stack {
       logRetention: logs.RetentionDays.ONE_WEEK,
       code: lambda.Code.fromAsset(lambdasPath + '/zipper'),
       environment: {
-        "REGION": props?.env?.region as string
+        "REGION": props?.env?.region as string,
+        "TABLE_NAME": table.tableName,
       },
       timeout: Duration.seconds(30),
       memorySize: 2048
@@ -170,6 +169,9 @@ export class HeicToJpgStack extends Stack {
     addMethodOnGatewayApi(this, requestsLambda, requestsApi, "GET", "requests-query-string-validator", ["nbFiles"])
     addMethodOnGatewayApi(this, presignLambda, preSignApi, "GET", "pres-sign-query-string-validator", ["fileName", "requestId", "targetMime"])
 
+    table.grantReadWriteData(requestsLambda)
+    table.grantReadData(presignLambda)
+    table.grantReadData(zipperLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)

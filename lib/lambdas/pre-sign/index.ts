@@ -54,7 +54,6 @@ async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParam
   }
 
   const requestItem = await getRequestItem(requestId as string)
-  console.log(requestItem)
   if (!requestItem.Item) {
     return toLambdaOutput(400, `requestId ${requestId} does not exist`)
   }
