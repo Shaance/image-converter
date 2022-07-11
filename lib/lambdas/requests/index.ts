@@ -37,7 +37,11 @@ function validateRequest(nbFiles: string) {
 export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
   const nbFiles = event.queryStringParameters?.nbFiles as string
-  validateRequest(nbFiles)
+  const errOutput = validateRequest(nbFiles)
+  if (!!errOutput) {
+    return errOutput
+  }
+
   const requestId = uuidv4()
   console.log(`Generated uuid ${requestId}`)
   
