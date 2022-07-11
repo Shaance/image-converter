@@ -11,6 +11,7 @@ import {
   RemovalPolicy,
 } from 'aws-cdk-lib';
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
+import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
@@ -33,6 +34,18 @@ function getGatewayLambdaResponseMethod() {
       'method.response.header.Access-Control-Allow-Credentials': true
     },
   }
+}
+
+function toGatewayApi(scope: Construct, apiName: string, lambdaFn: IFunction, allowMethods: string[], proxy = true) {
+  return new api_gateway.LambdaRestApi(scope, apiName, {
+    handler: lambdaFn,
+    proxy,
+    defaultCorsPreflightOptions: {
+      allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
+      allowMethods,
+      allowOrigins: api_gateway.Cors.ALL_ORIGINS,
+    },
+  });
 }
 
 export class HeicToJpgStack extends Stack {
@@ -121,35 +134,10 @@ export class HeicToJpgStack extends Stack {
       timeout: Duration.seconds(30),
       memorySize: 2048
     });
-   
-    new api_gateway.LambdaRestApi(this, 'PreSignAPI', {
-      handler: presignLambda,
-      defaultCorsPreflightOptions: {
-        allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
-        allowMethods: ['POST'],
-        allowOrigins: api_gateway.Cors.ALL_ORIGINS,
-      },
-    });
 
-    const requestsApi = new api_gateway.LambdaRestApi(this, 'RequestsAPI', {
-      handler: requestsLambda,
-      proxy: false,
-      defaultCorsPreflightOptions: {
-        allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
-        allowMethods: ['GET'],
-        allowOrigins: api_gateway.Cors.ALL_ORIGINS,
-      },
-    });
-
-    const statusApi = new api_gateway.LambdaRestApi(this, 'StatusAPI', {
-      handler: statusLambda,
-      proxy: false,
-      defaultCorsPreflightOptions: {
-        allowHeaders: api_gateway.Cors.DEFAULT_HEADERS,
-        allowMethods: ['GET'],
-        allowOrigins: api_gateway.Cors.ALL_ORIGINS,
-      },
-    });
+    const preSignApi = toGatewayApi(this, 'PreSignAPI', presignLambda, ['POST'])
+    const requestsApi = toGatewayApi(this, 'RequestsAPI', requestsLambda, ['GET'], false)
+    const statusApi = toGatewayApi(this, 'StatusAPI', statusLambda, ['GET'], false)
 
     const statusLambdaIntegration = new api_gateway.LambdaIntegration(statusLambda)
     statusApi.root.addMethod("GET", statusLambdaIntegration, {

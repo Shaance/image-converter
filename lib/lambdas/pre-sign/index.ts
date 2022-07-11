@@ -39,16 +39,17 @@ function validateRequest(fileName: string, requestId: string, totalFiles: number
     return toLambdaOutput(400, `${targetMime} targetMime is not supported, valid values are: ${validTargetMimes}`)
   }
 
+  // TODO remove once client updated to retrieve requestId through requrests lambda
   if (isNaN(+totalFiles)) {
     return toLambdaOutput(400, "totalFiles should be a number")
   }
 
   if (totalFiles < 1) {
-    return toLambdaOutput(400, "totalFiles should be at least 1 ")
+    return toLambdaOutput(400, "totalFiles should be at least 1")
   }
 
   if (totalFiles > 50) {
-    return toLambdaOutput(50, "totalFiles can't be higher than 50 ")
+    return toLambdaOutput(400, "totalFiles can't be higher than 50 ")
   }
 
   return
