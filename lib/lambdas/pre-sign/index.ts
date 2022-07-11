@@ -58,8 +58,11 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
 }
 
 // optimistic locking
-async function updatePresignUrlCount(requestId: string, retries = 10): Promise<UpdateItemCommandOutput> {
-  if (retries < 1) {
+async function updatePresignUrlCount(requestId: string, maxRetries = 10, retriesCount = 1): Promise<UpdateItemCommandOutput> {
+  if (retriesCount < 1) {
+    retriesCount = 1
+  }
+  if (retriesCount > maxRetries) {
     return Promise.reject("Could not update after retries")
   }
 
@@ -87,8 +90,10 @@ async function updatePresignUrlCount(requestId: string, retries = 10): Promise<U
     return await ddbClient.send(new UpdateItemCommand(params))
   } catch (err) {
     console.log(err)
-    await sleep(Math.random() * 25)
-    return updatePresignUrlCount(requestId, retries - 1)
+    const sleepMs = Math.random() * 25 * retriesCount
+    console.log(`Sleeping for ${sleep}ms`)
+    await sleep(sleepMs)
+    return updatePresignUrlCount(requestId, maxRetries, retriesCount + 1)
   }
 }
 
