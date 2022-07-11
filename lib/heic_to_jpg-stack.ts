@@ -117,9 +117,12 @@ export class HeicToJpgStack extends Stack {
       code: lambda.Code.fromAsset(lambdasPath + '/pre-sign'),
       environment: {
         "BUCKET_NAME": bucket.bucketName,
-        "REGION": props?.env?.region as string
+        "REGION": props?.env?.region as string,
+        "TABLE_NAME": table.tableName,
       },
     });
+
+    table.grantReadData(presignLambda)
 
     const statusLambda = new lambda.Function(this, "StatusLambda", {
       runtime: lambda.Runtime.NODEJS_16_X,

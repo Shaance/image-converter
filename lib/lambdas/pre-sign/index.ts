@@ -7,12 +7,15 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
+import { DynamoDBClient, GetItemCommand, GetItemCommandOutput } from "@aws-sdk/client-dynamodb";
 // import { add } from 'date-fns';
 
 const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
 const validTargetMimes = ['image/jpeg', 'image/png'];
 const validTargetMimesSet = new Set<string>(validTargetMimes);
+const tableName = process.env.TABLE_NAME as string;
+const ddbClient = new DynamoDBClient({ region });
 
 function toExtension(fileName: string): string {
   return fileName.substring(fileName.lastIndexOf('.'))
@@ -31,11 +34,29 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
-function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters) {
-  const { totalFiles, targetMime } = queryParams
+async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> {
+  const params = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    ProjectionExpression: "state", // any attribute would do
+  };
+  
+  return ddbClient.send(new GetItemCommand(params))
+}
+
+async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters) {
+  const { totalFiles, targetMime, requestId } = queryParams
   
   if (!validTargetMimesSet.has(targetMime!)) {
     return toLambdaOutput(400, `${targetMime} targetMime is not supported, valid values are: ${validTargetMimes}`)
+  }
+
+  const requestItem = await getRequestItem(requestId as string)
+  console.log(requestItem)
+  if (!requestItem.Item) {
+    return toLambdaOutput(400, `requestId ${requestId} does not exist`)
   }
 
   // TODO remove once client updated to retrieve requestId through requrests lambda
@@ -56,7 +77,7 @@ function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters)
 
 export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
     console.log(event)
-    const errOutput = validateRequest(event.queryStringParameters!)
+    const errOutput = await validateRequest(event.queryStringParameters!)
     const { fileName, requestId, totalFiles, targetMime } = event.queryStringParameters!;
     
     if (!!errOutput) {
