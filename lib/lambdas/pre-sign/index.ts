@@ -73,7 +73,7 @@ async function updatePresignUrlCount(requestId: string, retries = 10): Promise<U
       ":n" : { N: "1" },
       ":newChangeMadeAt" : { S: new Date().toISOString() },
     },
-    ConditionExpression: "#updatedAt = :modifiedAt",
+    ConditionExpression: "#updatedAt = modifiedAt",
   };
 
   try {
