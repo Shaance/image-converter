@@ -31,7 +31,7 @@ function validateRequest(event: APIGatewayProxyEvent) {
   }
 
   if (nbFiles > 50) {
-    return toLambdaOutput(50, "nbFiles can't be higher than 50 ")
+    return toLambdaOutput(400, "nbFiles can't be higher than 50 ")
   }
 
   return
