@@ -91,7 +91,7 @@ async function updatePresignUrlCount(requestId: string, maxRetries = 10, retries
   } catch (err) {
     console.log(err)
     const sleepMs = Math.random() * 25 * retriesCount
-    console.log(`Sleeping for ${sleep}ms`)
+    console.log(`Sleeping for ${sleepMs}ms`)
     await sleep(sleepMs)
     return updatePresignUrlCount(requestId, maxRetries, retriesCount + 1)
   }
