@@ -120,8 +120,6 @@ export class HeicToJpgStack extends Stack {
       },
     });
 
-    
-
     const statusLambda = new lambda.Function(this, "StatusLambda", {
       runtime: lambda.Runtime.NODEJS_16_X,
       architecture: lambda.Architecture.ARM_64,
@@ -170,7 +168,7 @@ export class HeicToJpgStack extends Stack {
     addMethodOnGatewayApi(this, presignLambda, preSignApi, "GET", "pres-sign-query-string-validator", ["fileName", "requestId", "targetMime"])
 
     table.grantReadWriteData(requestsLambda)
-    table.grantReadData(presignLambda)
+    table.grantReadWriteData(presignLambda)
     table.grantReadData(zipperLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);

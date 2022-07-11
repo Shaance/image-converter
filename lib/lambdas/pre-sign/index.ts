@@ -7,7 +7,14 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
-import { DynamoDBClient, GetItemCommand, GetItemCommandOutput } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  GetItemCommandOutput,
+  UpdateItemCommand,
+  UpdateItemCommandInput,
+  UpdateItemCommandOutput,
+} from "@aws-sdk/client-dynamodb";
 // import { add } from 'date-fns';
 
 const bucketName = process.env.BUCKET_NAME as string;
@@ -44,6 +51,37 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
   };
   
   return ddbClient.send(new GetItemCommand(params))
+}
+
+// optimistic locking
+async function updatePresignUrlCount(requestId: string, retries = 10): Promise<UpdateItemCommandOutput> {
+  if (retries < 1) {
+    return Promise.reject("Could not update after retries")
+  }
+
+  const params: UpdateItemCommandInput = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    UpdateExpression: "ADD #c :n SET #updatedAt = :newChangeMadeAt",
+    ExpressionAttributeNames: {
+      "#c" : "presignedUrls",
+      "#updatedAt" : "modifiedAt",
+    },
+    ExpressionAttributeValues: {
+      ":n" : { N: "1" },
+      ":newChangeMadeAt" : { S: new Date().toISOString() },
+    },
+    ConditionExpression: "#updatedAt = :modifiedAt",
+  };
+
+  try {
+    return await ddbClient.send(new UpdateItemCommand(params))
+  } catch (err) {
+    console.log(err)
+    return updatePresignUrlCount(requestId, retries - 1)
+  }
 }
 
 async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters) {
@@ -101,6 +139,6 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
       getObjectSignedUrl,
       putObjectSignedUrl,
     }
-
+    await updatePresignUrlCount(requestId as string)
     return toLambdaOutput(200, responseBody);
 }
