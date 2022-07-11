@@ -71,15 +71,17 @@ async function updateCount(requestId: string, countAttribute: string, retriesLef
     Key: {
       requestId: { S: requestId },
     },
-    UpdateExpression: "ADD #currentCount :n SET #updatedAt = :newChangeMadeAt",
+    UpdateExpression: "ADD #currentCount :n SET #updatedAt = :newChangeMadeAt, #state = :state",
     ExpressionAttributeNames: {
       "#currentCount" : countAttribute,
       "#updatedAt" : "modifiedAt",
+      "#state" : "state",
     },
     ExpressionAttributeValues: {
       ":n" : { N: "1" },
       ":newChangeMadeAt": { S: new Date().toISOString() },
       ":modifiedAtFromItem": { S: modifiedAt as string },
+      ":state": { S: "CONVERTING" },
     },
     ConditionExpression: "#updatedAt = :modifiedAtFromItem",
   };
