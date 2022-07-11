@@ -18,19 +18,16 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
-function validateRequest(event: APIGatewayProxyEvent) {
-  // API gateway should make sure it's never false
-  const { nbFiles } = JSON.parse(event.body!)
-
+function validateRequest(nbFiles: string) {
   if (isNaN(+nbFiles)) {
     return toLambdaOutput(400, "nbFiles should be a number")
   }
 
-  if (nbFiles < 1) {
+  if (Number(nbFiles) < 1) {
     return toLambdaOutput(400, "nbFiles should be at least 1 ")
   }
 
-  if (nbFiles > 50) {
+  if (Number(nbFiles) > 50) {
     return toLambdaOutput(400, "nbFiles can't be higher than 50 ")
   }
 
@@ -39,8 +36,8 @@ function validateRequest(event: APIGatewayProxyEvent) {
 
 export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
-  validateRequest(event)
-  const { nbFiles } = JSON.parse(event.body!)
+  const nbFiles = event.queryStringParameters?.nbFiles as string
+  validateRequest(nbFiles)
   const requestId = uuidv4()
   console.log(`Generated uuid ${requestId}`)
   
