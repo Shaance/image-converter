@@ -47,7 +47,7 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
     Key: {
       requestId: { S: requestId },
     },
-    ProjectionExpression: "nbFiles", // any attribute would do
+    ProjectionExpression: "modifiedAt", // any attribute would do
   };
   
   return ddbClient.send(new GetItemCommand(params))
@@ -58,6 +58,8 @@ async function updatePresignUrlCount(requestId: string, retries = 10): Promise<U
   if (retries < 1) {
     return Promise.reject("Could not update after retries")
   }
+
+  const modifiedAt = (await getRequestItem(requestId)).Item?.modifiedAt.S
 
   const params: UpdateItemCommandInput = {
     TableName: tableName,
@@ -71,9 +73,10 @@ async function updatePresignUrlCount(requestId: string, retries = 10): Promise<U
     },
     ExpressionAttributeValues: {
       ":n" : { N: "1" },
-      ":newChangeMadeAt" : { S: new Date().toISOString() },
+      ":newChangeMadeAt": { S: new Date().toISOString() },
+      ":modifiedAtFromItem": { S: modifiedAt as string },
     },
-    ConditionExpression: "#updatedAt = modifiedAt",
+    ConditionExpression: "#updatedAt = :modifiedAtFromItem",
   };
 
   try {
