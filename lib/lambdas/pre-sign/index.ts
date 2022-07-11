@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
+import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 // import { add } from 'date-fns';
 
 const bucketName = process.env.BUCKET_NAME as string;
@@ -30,25 +31,23 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
-function validateRequest(fileName: string, requestId: string, totalFiles: number, targetMime: string) {
-  if (!fileName || !requestId || !totalFiles || !targetMime) {
-    return toLambdaOutput(400, "body must have all the properties: fileName, requestId, totalFiles, targetMime");
-  }
+function validateRequest(queryParams: APIGatewayProxyEventQueryStringParameters) {
+  const { totalFiles, targetMime } = queryParams
   
-  if (!validTargetMimesSet.has(targetMime)) {
+  if (!validTargetMimesSet.has(targetMime!)) {
     return toLambdaOutput(400, `${targetMime} targetMime is not supported, valid values are: ${validTargetMimes}`)
   }
 
   // TODO remove once client updated to retrieve requestId through requrests lambda
-  if (isNaN(+totalFiles)) {
+  if (isNaN(+totalFiles!)) {
     return toLambdaOutput(400, "totalFiles should be a number")
   }
 
-  if (totalFiles < 1) {
+  if (Number(totalFiles) < 1) {
     return toLambdaOutput(400, "totalFiles should be at least 1")
   }
 
-  if (totalFiles > 50) {
+  if (Number(totalFiles) > 50) {
     return toLambdaOutput(400, "totalFiles can't be higher than 50 ")
   }
 
@@ -57,26 +56,25 @@ function validateRequest(fileName: string, requestId: string, totalFiles: number
 
 export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
     console.log(event)
-    let { fileName, requestId, totalFiles, targetMime } = JSON.parse(event.body);
+    const errOutput = validateRequest(event.queryStringParameters!)
+    const { fileName, requestId, totalFiles, targetMime } = event.queryStringParameters!;
     
-    const errOutput = validateRequest(fileName, requestId, totalFiles, targetMime)
     if (!!errOutput) {
       return errOutput
     }
     
-    const nameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
-    const extension = toExtension(fileName);
+    const nameWithoutExtension = fileName!.substring(0, fileName!.lastIndexOf('.'));
+    const extension = toExtension(fileName!);
 
     const s3Client = new S3Client({ region: region })
 
-    // soft limit to 50 total files, will never need pagination
     const putParams = {
       Bucket: bucketName,
       Key: `OriginalImages/${requestId}/${uuidv4()}${extension}`,
       Metadata: {
-        "total-files": totalFiles.toString(),
+        "total-files": totalFiles as string,
         "original-name": nameWithoutExtension,
-        "target-mime": targetMime
+        "target-mime": targetMime as string
       },
       // Expires: add(new Date(), {
       //   hours: 1

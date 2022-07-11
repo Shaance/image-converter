@@ -1,4 +1,3 @@
-import { handler } from './lambdas/status/index';
 import {
   Stack,
   StackProps,
@@ -160,12 +159,13 @@ export class HeicToJpgStack extends Stack {
       memorySize: 2048
     });
 
-    const preSignApi = toGatewayApi(this, 'PreSignAPI', presignLambda, ['POST'])
+    const preSignApi = toGatewayApi(this, 'PreSignAPI', presignLambda, ['GET'], false)
     const requestsApi = toGatewayApi(this, 'RequestsAPI', requestsLambda, ['GET'], false)
     const statusApi = toGatewayApi(this, 'StatusAPI', statusLambda, ['GET'], false)
 
     addMethodOnGatewayApi(this, statusLambda, statusApi, "GET", "status-query-string-validator", ["requestId"])
     addMethodOnGatewayApi(this, requestsLambda, requestsApi, "GET", "requests-query-string-validator", ["nbFiles"])
+    addMethodOnGatewayApi(this, presignLambda, preSignApi, "GET", "pres-sign-query-string-validator", ["fileName", "requestId", "targetMime"])
 
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
