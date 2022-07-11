@@ -103,7 +103,7 @@ async function updatePresignUrlCount(requestId: string, retriesLeft = 10, delay 
     delay = delay * 0.8 + Math.random() * delay * 0.2
     console.log(delay)
     await sleep(delay)
-    return updatePresignUrlCount(requestId, retriesLeft - 1, delay)
+    return updatePresignUrlCount(requestId, retriesLeft - 1, delay * 2)
   }
 }
 
