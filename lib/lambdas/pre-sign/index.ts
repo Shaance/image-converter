@@ -10,6 +10,7 @@ import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 import {
   DynamoDBClient,
   GetItemCommand,
+  GetItemCommandInput,
   GetItemCommandOutput,
   UpdateItemCommand,
   UpdateItemCommandInput,
@@ -23,6 +24,8 @@ const validTargetMimes = ['image/jpeg', 'image/png'];
 const validTargetMimesSet = new Set<string>(validTargetMimes);
 const tableName = process.env.TABLE_NAME as string;
 const ddbClient = new DynamoDBClient({ region });
+const outOfRetries = "OutOfRetries"
+const maximumUrlGenerated = "MaxUrlReached"
 
 function toExtension(fileName: string): string {
   return fileName.substring(fileName.lastIndexOf('.'))
@@ -45,13 +48,14 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> {
-  const params = {
+async function getRequestItem(requestId: string, projectionExpression: string, consistentRead = false): Promise<GetItemCommandOutput> {
+  const params: GetItemCommandInput = {
     TableName: tableName,
     Key: {
       requestId: { S: requestId },
     },
-    ProjectionExpression: "modifiedAt", // any attribute would do
+    ProjectionExpression: projectionExpression,
+    ConsistentRead: consistentRead
   };
   
   return ddbClient.send(new GetItemCommand(params))
@@ -63,19 +67,25 @@ async function updatePresignUrlCount(requestId: string, maxRetries = 10, retries
     retriesCount = 1
   }
   if (retriesCount > maxRetries) {
-    return Promise.reject("Could not update after retries")
+    return Promise.reject(outOfRetries)
   }
 
-  const modifiedAt = (await getRequestItem(requestId)).Item?.modifiedAt.S
+  const requestItem = (await getRequestItem(requestId, "modifiedAt, presignedUrls, nbFiles", true)).Item
+  const modifiedAt = requestItem?.modifiedAt.S
+  const presignedUrls = Number(requestItem?.presignedUrls.N as string)
+  const nbFiles = Number(requestItem?.nbFiles.N as string)
+  if (presignedUrls > nbFiles) {
+    return Promise.reject(maximumUrlGenerated)
+  }
 
   const params: UpdateItemCommandInput = {
     TableName: tableName,
     Key: {
       requestId: { S: requestId },
     },
-    UpdateExpression: "ADD #c :n SET #updatedAt = :newChangeMadeAt",
+    UpdateExpression: "ADD #currentCount :n SET #updatedAt = :newChangeMadeAt",
     ExpressionAttributeNames: {
-      "#c" : "presignedUrls",
+      "#currentCount" : "presignedUrls",
       "#updatedAt" : "modifiedAt",
     },
     ExpressionAttributeValues: {
@@ -90,9 +100,7 @@ async function updatePresignUrlCount(requestId: string, maxRetries = 10, retries
     return await ddbClient.send(new UpdateItemCommand(params))
   } catch (err) {
     console.log(err)
-    const sleepMs = Math.random() * 25 * retriesCount
-    console.log(`Sleeping for ${sleepMs}ms`)
-    await sleep(sleepMs)
+    await sleep(Math.random() * 25 * retriesCount)
     return updatePresignUrlCount(requestId, maxRetries, retriesCount + 1)
   }
 }
@@ -104,7 +112,7 @@ async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParam
     return toLambdaOutput(400, `${targetMime} targetMime is not supported, valid values are: ${validTargetMimes}`)
   }
 
-  const requestItem = await getRequestItem(requestId as string)
+  const requestItem = await getRequestItem(requestId as string, "modifiedAt") // any attribute would do
   if (!requestItem.Item) {
     return toLambdaOutput(400, `requestId ${requestId} does not exist`)
   }
