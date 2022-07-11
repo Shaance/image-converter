@@ -14,6 +14,7 @@ import {
   UpdateItemCommand,
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
+  UpdateItemOutput,
 } from "@aws-sdk/client-dynamodb";
 import { Readable } from "stream";
 import { v4 as uuidv4 } from 'uuid';
@@ -55,7 +56,7 @@ async function getRequestItem(requestId: string, projectionExpression: string, c
   return ddbClient.send(new GetItemCommand(params))
 }
 
-async function updateCount(requestId: string, countAttribute: string, retriesLeft = 10, delay = 25): Promise<UpdateItemCommandOutput> {
+async function updateCount(requestId: string, countAttribute: string, returnValues: string, retriesLeft = 10, delay = 25): Promise<UpdateItemCommandOutput> {
   if (retriesLeft < 1) {
     retriesLeft = 1
   }
@@ -84,7 +85,7 @@ async function updateCount(requestId: string, countAttribute: string, retriesLef
       ":state": { S: "CONVERTING" },
     },
     ConditionExpression: "#updatedAt = :modifiedAtFromItem",
-    ReturnValues: "ALL_NEW"
+    ReturnValues: returnValues
   };
 
   try {
@@ -94,7 +95,7 @@ async function updateCount(requestId: string, countAttribute: string, retriesLef
     delay = delay * 0.8 + Math.random() * delay * 0.2
     console.log(delay)
     await sleep(delay)
-    return updateCount(requestId, countAttribute, retriesLeft - 1, delay * 2)
+    return updateCount(requestId, countAttribute, returnValues, retriesLeft - 1, delay * 2)
   }
 }
 
@@ -146,13 +147,23 @@ function toNewKey(key: string, targetMime: string) {
     + '.' + extension;
 }
 
+function pushToQueue(item: UpdateItemOutput) {
+  const convertedFiles = item.Attributes?.convertedFiles.N
+  const nbFiles = item.Attributes?.nbFiles.N
+
+  if (convertedFiles === nbFiles) {
+    // TODO push to queue
+    console.log("Should push to Q!")
+  }
+}
+
 async function convertFromS3(record: S3EventRecordDetail) {
   console.log(record)
   const conversionId = uuidv4()
   const bucket = record.bucket.name;
   const key = record.object.key;
   const requestId = key.split('/')[1]
-  await updateCount(requestId, "uploadedFiles")
+  await updateCount(requestId, "uploadedFiles", "NONE")
   const object = await getObjectFrom(bucket, key)
   const targetMime = object.Metadata!["target-mime"];
   const buffer = await toArrayBuffer(object.Body as Readable)
@@ -166,8 +177,8 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const targetKey = toNewKey(key, targetMime)
   const originalName = object.Metadata!["original-name"];
   await putObjectTo(bucket, targetKey, outputBuffer, originalName)
-  const updatedItem = await updateCount(requestId, "convertedFiles")
-  console.log(updatedItem)
+  const updatedItem = await updateCount(requestId, "convertedFiles", "ALL_NEW")
+  pushToQueue(updatedItem)
 }
 
 export const handler = async function (event: S3Event) {

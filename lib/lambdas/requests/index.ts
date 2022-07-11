@@ -64,8 +64,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
   };
 
   try {
-    const data = await ddbClient.send(new PutItemCommand(params));
-    console.log("Success - item added", data);
+    await ddbClient.send(new PutItemCommand(params));
   } catch (err) {
     // @ts-ignore
     console.log("Error", err.stack);
