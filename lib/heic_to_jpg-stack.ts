@@ -160,7 +160,7 @@ export class HeicToJpgStack extends Stack {
     table.grantReadWriteData(requestsLambda)
     table.grantReadWriteData(presignLambda)
     table.grantReadWriteData(converterLambda)
-    table.grantReadData(zipperLambda)
+    table.grantReadWriteData(zipperLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)

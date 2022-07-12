@@ -9,7 +9,11 @@ import {
   PutObjectCommandOutput,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
-import { DynamoDBClient, GetItemCommand, GetItemCommandOutput } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient,
+  UpdateItemCommand,
+  UpdateItemCommandInput,
+  UpdateItemCommandOutput,
+} from "@aws-sdk/client-dynamodb";
 import { Readable, Stream } from "stream";
 import * as JSZip from "jszip";
 import { add } from "date-fns";
@@ -37,16 +41,24 @@ async function getObjectFrom(bucket: string, key: string): Promise<GetObjectComm
   }))
 }
 
-async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> {
-  const params = {
+async function updateStatus(requestId: string): Promise<UpdateItemCommandOutput> {
+  const params: UpdateItemCommandInput = {
     TableName: tableName,
     Key: {
       requestId: { S: requestId },
     },
-    ProjectionExpression: "nbFiles",
+    UpdateExpression: "SET #updatedAt = :newChangeMadeAt, #state = :state",
+    ExpressionAttributeNames: {
+      "#updatedAt" : "modifiedAt",
+      "#state" : "state",
+    },
+    ExpressionAttributeValues: {
+      ":newChangeMadeAt": { S: new Date().toISOString() },
+      ":state": { S: "ZIPPING" },
+    },
   };
 
-  return ddbClient.send(new GetItemCommand(params))
+  return ddbClient.send(new UpdateItemCommand(params))
 }
 
 async function listObjects(bucket: string, prefix: string): Promise<ListObjectsV2CommandOutput> {
@@ -97,11 +109,13 @@ export const handler = async function (event: SQSEvent) {
   return await Promise.all(event.Records.map(async (record) => {
     console.log(JSON.parse(record.body))
     const { requestId, bucketName, prefix } = JSON.parse(record.body)
+    const statusPromise = updateStatus(requestId)
     const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
     console.time("Uploading")
     await putObjectTo(bucketName, targetKey, archiveBuffer);
     console.timeEnd("Uploading")
+    await statusPromise // not critical
   }))
     .then(() => {
       return toLambdaOutput(200, "Finished zipping")
