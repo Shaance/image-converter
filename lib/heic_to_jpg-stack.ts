@@ -7,6 +7,7 @@ import {
   aws_s3_notifications as s3n,
   aws_dynamodb as ddb,
   aws_apigateway as api_gateway,
+  aws_sqs as sqs,
   Duration,
   RemovalPolicy,
 } from 'aws-cdk-lib';
@@ -15,6 +16,7 @@ import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 
 function createRequestsTable(scope: Construct): Table {
   return new ddb.Table(scope, 'RequestsTable', {
@@ -72,94 +74,80 @@ function addMethodOnGatewayApi(scope: Construct, lambdaFn: IFunction, api: Lambd
   })
 }
 
+function createImagesBucket(scope: Construct): s3.Bucket {
+  return new s3.Bucket(scope, 'HeicToJpgBucket', {
+    enforceSSL: true,
+    autoDeleteObjects: true,
+    removalPolicy: RemovalPolicy.DESTROY,
+    cors: [{
+      allowedHeaders: ["*"],
+      allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
+      allowedOrigins: api_gateway.Cors.ALL_ORIGINS,
+    }],
+    lifecycleRules: [{
+      expiration: Duration.days(1)
+    }]
+  });
+}
+
+function createNodeArmLambda(scope: Construct, name: string, codePath: string, environment?: {[key: string]: string}, timeout = Duration.seconds(3), memorySize = 128) {
+  return new lambda.Function(scope, name, {
+    runtime: lambda.Runtime.NODEJS_16_X,
+    architecture: lambda.Architecture.ARM_64,
+    handler: 'index.handler',
+    logRetention: logs.RetentionDays.ONE_DAY,
+    code: lambda.Code.fromAsset(codePath),
+    timeout,
+    environment,
+    memorySize,
+  });
+}
+
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     const lambdasPath = './lib/lambdas/';
-    
-    // TODO SSE encryption
-    const bucket = new s3.Bucket(this, 'HeicToJpgBucket', {
-      enforceSSL: true,
-      autoDeleteObjects: true,
-      removalPolicy: RemovalPolicy.DESTROY,
-      cors: [{
-        allowedHeaders: ["*"],
-        allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
-        allowedOrigins: api_gateway.Cors.ALL_ORIGINS,
-      }],
-      lifecycleRules: [{
-        expiration: Duration.days(1)
-      }]
-    });
-
+    const bucket = createImagesBucket(this)
     const table = createRequestsTable(this)
 
-    const requestsLambda = new lambda.Function(this, "RequestsLambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_DAY,
-      code: lambda.Code.fromAsset(lambdasPath + '/requests'),
-      timeout: Duration.seconds(10),
-      environment: {
-        "TABLE_NAME": table.tableName,
-        "REGION": props?.env?.region as string,
-      },
-    });
+    const requestsLambda = createNodeArmLambda(this, "RequestsLambda", lambdasPath + '/requests', {
+      "TABLE_NAME": table.tableName,
+      "REGION": props?.env?.region as string,
+    }, Duration.seconds(10))
 
-    const presignLambda = new lambda.Function(this, "PreSignLambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_DAY,
-      code: lambda.Code.fromAsset(lambdasPath + '/pre-sign'),
-      environment: {
-        "BUCKET_NAME": bucket.bucketName,
-        "REGION": props?.env?.region as string,
-        "TABLE_NAME": table.tableName,
-      },
-    });
+    const presignLambda = createNodeArmLambda(this, "PreSignLambda", lambdasPath + '/pre-sign', {
+      "BUCKET_NAME": bucket.bucketName,
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+    })
 
-    const statusLambda = new lambda.Function(this, "StatusLambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_DAY,
-      code: lambda.Code.fromAsset(lambdasPath + '/status'),
-      environment: {
-        "BUCKET_NAME": bucket.bucketName,
-        "REGION": props?.env?.region as string
-      },
-    });
+    const statusLambda = createNodeArmLambda(this, "StatusLambda", lambdasPath + '/status', {
+      "BUCKET_NAME": bucket.bucketName,
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+    })
 
-    const converterLambda = new lambda.Function(this, "ConvertLambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_WEEK,
-      code: lambda.Code.fromAsset(lambdasPath + '/converter'),
-      environment: {
-        "REGION": props?.env?.region as string,
-        "TABLE_NAME": table.tableName,
-      },
-      timeout: Duration.seconds(30),
-      memorySize: 1024
-    });
+    const converterLambda = createNodeArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+    }, Duration.seconds(30), 1024)
 
-    const zipperLambda = new lambda.Function(this, "ZipperLambda", {
-      runtime: lambda.Runtime.NODEJS_16_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: 'index.handler',
-      logRetention: logs.RetentionDays.ONE_WEEK,
-      code: lambda.Code.fromAsset(lambdasPath + '/zipper'),
-      environment: {
-        "REGION": props?.env?.region as string,
-        "TABLE_NAME": table.tableName,
-      },
-      timeout: Duration.seconds(30),
-      memorySize: 2048
-    });
+    const archiveQueue = new sqs.Queue(this, "ArchiveQueue", {
+      removalPolicy: RemovalPolicy.DESTROY
+    })
+
+    const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+      "QUEUE_URL": archiveQueue.queueUrl
+    }, Duration.seconds(30), 2048)
+
+    archiveQueue.grantSendMessages(converterLambda)
+    archiveQueue.grantConsumeMessages(zipperLambda)
+
+    // TODO DLQ
+    zipperLambda.addEventSource(new SqsEventSource(archiveQueue))
 
     const preSignApi = toGatewayApi(this, 'PreSignAPI', presignLambda, ['GET'], false)
     const requestsApi = toGatewayApi(this, 'RequestsAPI', requestsLambda, ['GET'], false)
