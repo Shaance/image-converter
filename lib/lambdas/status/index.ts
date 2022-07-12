@@ -1,47 +1,38 @@
+import { DynamoDBClient, GetItemCommand, GetItemCommandInput, GetItemCommandOutput } from '@aws-sdk/client-dynamodb';
 import { StatusAPIGatewayProxyEvent } from './@types/StatusAPIEvent';
-import {
-  S3Client,
-  ListObjectsV2Command,
-  ListObjectsV2CommandOutput,
-} from '@aws-sdk/client-s3';
 
-const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
-const s3Client = new S3Client({ region: region })
-
-enum ConversionStatus {
-  PROCESSING = "PROCESSING",
-  DONE = "DONE"
-}
+const tableName = process.env.TABLE_NAME as string;
+const ddbClient = new DynamoDBClient({ region });
 
 interface ConversionStatusDetail {
-  status: ConversionStatus,
-  processed?: number
+  status: string,
+  uploaded: number,
+  processed: number,
 }
 
-async function listObjects(prefix: string): Promise<ListObjectsV2CommandOutput> {
-  return s3Client.send(new ListObjectsV2Command({
-    Bucket: bucketName,
-    Prefix: prefix,
-  })
-  )
+async function getRequestItem(requestId: string, projectionExpression: string): Promise<GetItemCommandOutput> {
+  const params: GetItemCommandInput = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    ProjectionExpression: projectionExpression,
+  };
+  
+  return ddbClient.send(new GetItemCommand(params))
 }
 
 async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
-  let prefix = `Archives/${requestId}`
-  let listObjectResponse = await listObjects(prefix)
-  const archiveNb = listObjectResponse.KeyCount
-  if (!!archiveNb && archiveNb === 1) {
-    return {
-      status: ConversionStatus.DONE
-    }
-  }
+  const requestItem = await getRequestItem(requestId, "uploadedFiles,convertedFiles, state")
+  const uploadedFiles = Number(requestItem.Item?.uploadedFiles.N!)
+  const convertedFiles = Number(requestItem.Item?.convertedFiles.N!)
+  const state = requestItem.Item?.state.S!
 
-  prefix = prefix.replace("Archives", "Converted")
-  const convertedImagesNb = (await listObjects(prefix)).KeyCount
   return {
-    status: ConversionStatus.PROCESSING,
-    processed: convertedImagesNb
+    status: state,
+    uploaded: uploadedFiles,
+    processed: convertedFiles,
   }
 }
 

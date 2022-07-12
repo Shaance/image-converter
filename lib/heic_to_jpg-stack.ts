@@ -123,7 +123,6 @@ export class HeicToJpgStack extends Stack {
     })
 
     const statusLambda = createNodeArmLambda(this, "StatusLambda", lambdasPath + '/status', {
-      "BUCKET_NAME": bucket.bucketName,
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     })
@@ -161,10 +160,11 @@ export class HeicToJpgStack extends Stack {
     table.grantReadWriteData(presignLambda)
     table.grantReadWriteData(converterLambda)
     table.grantReadWriteData(zipperLambda)
+    table.grantReadData(statusLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)
-    bucket.grantReadWrite(statusLambda)
+
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
       new s3n.LambdaDestination(converterLambda),
