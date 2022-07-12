@@ -11,20 +11,25 @@ interface ConversionStatusDetail {
   processed: number,
 }
 
-async function getRequestItem(requestId: string, projectionExpression: string): Promise<GetItemCommandOutput> {
+async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> {
   const params: GetItemCommandInput = {
     TableName: tableName,
     Key: {
       requestId: { S: requestId },
     },
-    ProjectionExpression: projectionExpression,
+    ProjectionExpression: "#uploadedFiles,#convertedFiles,#state",
+    ExpressionAttributeNames: {
+      "#state" : "state",
+      "#uploadedFiles" : "uploadedFiles",
+      "#convertedFiles" : "convertedFiles",
+    },
   };
   
   return ddbClient.send(new GetItemCommand(params))
 }
 
 async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
-  const requestItem = await getRequestItem(requestId, "uploadedFiles,convertedFiles, state")
+  const requestItem = await getRequestItem(requestId)
   const uploadedFiles = Number(requestItem.Item?.uploadedFiles.N!)
   const convertedFiles = Number(requestItem.Item?.convertedFiles.N!)
   const state = requestItem.Item?.state.S!
