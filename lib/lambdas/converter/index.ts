@@ -59,7 +59,7 @@ async function getRequestItem(requestId: string, projectionExpression: string, c
   return ddbClient.send(new GetItemCommand(params))
 }
 
-async function updateCount(requestId: string, countAttribute: string, returnValues: string, retriesLeft = 10, delay = 25): Promise<UpdateItemCommandOutput> {
+async function updateCount(requestId: string, countAttribute: string, returnValues: string, retriesLeft = 15, delay = 25): Promise<UpdateItemCommandOutput> {
   if (retriesLeft < 1) {
     retriesLeft = 1
   }
@@ -98,7 +98,7 @@ async function updateCount(requestId: string, countAttribute: string, returnValu
     delay = delay * 0.8 + Math.random() * delay * 0.2
     console.log(delay)
     await sleep(delay)
-    return updateCount(requestId, countAttribute, returnValues, retriesLeft - 1, delay * 2)
+    return updateCount(requestId, countAttribute, returnValues, retriesLeft - 1, delay * 1.5)
   }
 }
 

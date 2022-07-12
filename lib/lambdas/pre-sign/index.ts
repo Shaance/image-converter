@@ -62,7 +62,7 @@ async function getRequestItem(requestId: string, projectionExpression: string, c
 }
 
 // optimistic locking
-async function updatePresignUrlCount(requestId: string, retriesLeft = 10, delay = 25): Promise<UpdateItemCommandOutput> {
+async function updatePresignUrlCount(requestId: string, retriesLeft = 15, delay = 25): Promise<UpdateItemCommandOutput> {
   if (retriesLeft < 1) {
     retriesLeft = 1
   }
@@ -103,7 +103,7 @@ async function updatePresignUrlCount(requestId: string, retriesLeft = 10, delay 
     delay = delay * 0.8 + Math.random() * delay * 0.2
     console.log(delay)
     await sleep(delay)
-    return updatePresignUrlCount(requestId, retriesLeft - 1, delay * 2)
+    return updatePresignUrlCount(requestId, retriesLeft - 1, delay * 1.5)
   }
 }
 
