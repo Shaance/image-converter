@@ -4,8 +4,6 @@ import {
   S3Client,
   ListObjectsV2Command,
   GetObjectCommand,
-  HeadObjectCommand,
-  HeadObjectCommandOutput,
   GetObjectCommandOutput,
   ListObjectsV2CommandOutput,
   PutObjectCommandOutput,
@@ -56,13 +54,6 @@ async function listObjects(bucket: string, prefix: string): Promise<ListObjectsV
   return s3Client.send(new ListObjectsV2Command({
     Bucket: bucket,
     Prefix: prefix,
-  }))
-}
-
-async function getMetadataFrom(bucket: string, key: string): Promise<HeadObjectCommandOutput> {
-  return s3Client.send(new HeadObjectCommand({
-    Bucket: bucket,
-    Key: key,
   }))
 }
 
@@ -124,6 +115,11 @@ async function archive(bucket: string, key: string, requestId: string): Promise<
 export const handler = async function (event: S3Event) {
   return await Promise.all(event.Records.map(async (record) => {
     console.log(record.s3);
+    if (!record.s3) {
+      // from SQS, just ignore from now
+      console.log(`Message from SQS ${record}`)
+      return Promise.resolve()
+    }
     const bucket = record.s3.bucket.name;
     const key = record.s3.object.key;
     const requestId = key.split('/')[1]

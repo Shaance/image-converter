@@ -16,6 +16,7 @@ import {
   UpdateItemCommandOutput,
   UpdateItemOutput,
 } from "@aws-sdk/client-dynamodb";
+import  { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Readable } from "stream";
 import { v4 as uuidv4 } from 'uuid';
 import { add } from 'date-fns'
@@ -25,6 +26,8 @@ const convert = require("heic-convert")
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region })
 const tableName = process.env.TABLE_NAME as string;
+const queueUrl = process.env.QUEUE_URL as string;
+const sqsClient = new SQSClient({ region });
 const ddbClient = new DynamoDBClient({ region });
 const outOfRetries = "OutOfRetries"
 
@@ -147,13 +150,31 @@ function toNewKey(key: string, targetMime: string) {
     + '.' + extension;
 }
 
-function pushToQueue(item: UpdateItemOutput) {
-  const convertedFiles = item.Attributes?.convertedFiles.N
-  const nbFiles = item.Attributes?.nbFiles.N
+async function pushToQueue(item: UpdateItemOutput, bucketName: string) {
+  const convertedFiles = item.Attributes?.convertedFiles.N!
+  const nbFiles = item.Attributes?.nbFiles.N!
+  const requestId = item.Attributes?.requestId.S!
+  const prefix = `Converted/${requestId}`
+  if (convertedFiles !== nbFiles) {
+    return
+  }
 
-  if (convertedFiles === nbFiles) {
-    // TODO push to queue
+  try {
+    const params = {
+      MessageBody: JSON.stringify({
+        requestId,
+        bucketName,
+        prefix
+      }),
+      QueueUrl: queueUrl
+    };
     console.log("Should push to Q!")
+    const data = await sqsClient.send(new SendMessageCommand(params));
+    console.log("Success, message sent. MessageID:", data.MessageId);
+    return data; // For unit tests.
+  } catch (err) {
+    console.log("Error", err);
+    return Promise.reject(err)
   }
 }
 
@@ -178,7 +199,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const originalName = object.Metadata!["original-name"];
   await putObjectTo(bucket, targetKey, outputBuffer, originalName)
   const updatedItem = await updateCount(requestId, "convertedFiles", "ALL_NEW")
-  pushToQueue(updatedItem)
+  await pushToQueue(updatedItem, bucket)
 }
 
 export const handler = async function (event: S3Event) {
