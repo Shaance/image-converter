@@ -172,14 +172,5 @@ export class HeicToJpgStack extends Stack {
         prefix: 'OriginalImages'
       }
     )
-    
-    // TODO deactivate when SQS properly plugged in from converter to zipper
-    bucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED_PUT,
-      new s3n.LambdaDestination(zipperLambda),
-      {
-        prefix: 'Converted'
-      }
-    )
   }
 }

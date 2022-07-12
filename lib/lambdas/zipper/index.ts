@@ -1,4 +1,4 @@
-import { S3Event } from "./@types/S3Event";
+import { SQSEvent } from "./@types/SQSEvent";
 
 import {
   S3Client,
@@ -16,7 +16,6 @@ import { add } from "date-fns";
 
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region });
-const totalFilesCache = new Map<string, number>();
 const tableName = process.env.TABLE_NAME as string;
 const ddbClient = new DynamoDBClient({ region });
 
@@ -46,7 +45,7 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
     },
     ProjectionExpression: "nbFiles",
   };
-  
+
   return ddbClient.send(new GetItemCommand(params))
 }
 
@@ -85,26 +84,8 @@ async function addToZip(zip: JSZip, bucket: string, key: string) {
   zip.file(originalName + extension, buffer)
 }
 
-async function archive(bucket: string, key: string, requestId: string): Promise<Buffer> {
-  const tmp = key.split('/')
-  const prefix = tmp.slice(0, 2).join('/')
-  let nbFiles: number;
-  if (totalFilesCache.has(prefix)) {
-    console.log(`Cache hit for ${prefix}`)
-    nbFiles = totalFilesCache.get(prefix) as number;
-  } else {
-    console.log(`${prefix} not cached yet`)
-    const ddbResponse = await getRequestItem(requestId)
-    nbFiles = Number(ddbResponse.Item?.nbFiles.N as string)
-    totalFilesCache.set(prefix, nbFiles)
-  }
-
+async function archive(bucket: string, prefix: string): Promise<Buffer> {
   const listObjResult = await listObjects(bucket, prefix)
-  console.log(`Metadata totalFiles: ${nbFiles}, keyCount: ${listObjResult.KeyCount}`)
-  if (!listObjResult.KeyCount || listObjResult.KeyCount as number !== nbFiles) {
-    return Promise.reject("Nothing to archive");
-  }
-
   const zip = new JSZip();
   console.time('archive')
   await Promise.all(listObjResult.Contents!!.map(c => addToZip(zip, bucket, c.Key as string)));
@@ -112,22 +93,14 @@ async function archive(bucket: string, key: string, requestId: string): Promise<
   return toArrayBuffer(zip.generateNodeStream())
 }
 
-export const handler = async function (event: S3Event) {
+export const handler = async function (event: SQSEvent) {
   return await Promise.all(event.Records.map(async (record) => {
-    console.log(record.s3);
-    if (!record.s3) {
-      // from SQS, just ignore from now
-      console.log(`Message from SQS:`)
-      console.log(record)
-      return Promise.resolve()
-    }
-    const bucket = record.s3.bucket.name;
-    const key = record.s3.object.key;
-    const requestId = key.split('/')[1]
-    const archiveBuffer = await archive(bucket, key, requestId);
+    console.log(JSON.parse(record.body))
+    const { requestId, bucketName, prefix } = JSON.parse(record.body)
+    const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
     console.time("Uploading")
-    await putObjectTo(bucket, targetKey, archiveBuffer);
+    await putObjectTo(bucketName, targetKey, archiveBuffer);
     console.timeEnd("Uploading")
   }))
     .then(() => {
