@@ -177,16 +177,27 @@ async function pushToQueue(item: UpdateItemOutput, bucketName: string) {
   }
 }
 
+async function uploadConvertedFile(key: string, bucket: string, targetMime: string, requestId: string, originalName: string, outputBuffer: Buffer) {
+  const targetKey = toNewKey(key, targetMime)
+  await putObjectTo(bucket, targetKey, outputBuffer, originalName)
+  const updatedItem = await updateCount(requestId, "convertedFiles", "ALL_NEW")
+  await pushToQueue(updatedItem, bucket)
+}
+
 async function convertFromS3(record: S3EventRecordDetail) {
   console.log(record)
   const conversionId = uuidv4()
   const bucket = record.bucket.name;
   const key = record.object.key;
   const requestId = key.split('/')[1]
+
   await updateCount(requestId, "uploadedFiles", "NONE")
+  
   const object = await getObjectFrom(bucket, key)
   const targetMime = object.Metadata!["target-mime"];
+  const originalName = object.Metadata!["original-name"];
   const buffer = await toArrayBuffer(object.Body as Readable)
+  
   console.time(`Conversion-${conversionId}`)
   const outputBuffer = await convert({
     buffer: buffer,
@@ -194,11 +205,8 @@ async function convertFromS3(record: S3EventRecordDetail) {
     quality: 1
   });
   console.timeEnd(`Conversion-${conversionId}`)
-  const targetKey = toNewKey(key, targetMime)
-  const originalName = object.Metadata!["original-name"];
-  await putObjectTo(bucket, targetKey, outputBuffer, originalName)
-  const updatedItem = await updateCount(requestId, "convertedFiles", "ALL_NEW")
-  await pushToQueue(updatedItem, bucket)
+
+  await uploadConvertedFile(key, bucket, targetMime, requestId, originalName, outputBuffer)
 }
 
 export const handler = async function (event: S3Event) {
