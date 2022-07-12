@@ -127,20 +127,20 @@ export class HeicToJpgStack extends Stack {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     })
-
-    const converterLambda = createNodeArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
-      "REGION": props?.env?.region as string,
-      "TABLE_NAME": table.tableName,
-    }, Duration.seconds(30), 1024)
-
+    
     const archiveQueue = new sqs.Queue(this, "ArchiveQueue", {
       removalPolicy: RemovalPolicy.DESTROY
     })
 
+    const converterLambda = createNodeArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+      "QUEUE_URL": archiveQueue.queueUrl,
+    }, Duration.seconds(30), 1024)
+
     const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
-      "QUEUE_URL": archiveQueue.queueUrl
     }, Duration.seconds(30), 2048)
 
     archiveQueue.grantSendMessages(converterLambda)
