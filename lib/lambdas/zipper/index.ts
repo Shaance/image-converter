@@ -117,7 +117,8 @@ export const handler = async function (event: S3Event) {
     console.log(record.s3);
     if (!record.s3) {
       // from SQS, just ignore from now
-      console.log(`Message from SQS ${record}`)
+      console.log(`Message from SQS:`)
+      console.log(record)
       return Promise.resolve()
     }
     const bucket = record.s3.bucket.name;
