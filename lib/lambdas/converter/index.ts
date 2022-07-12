@@ -168,7 +168,7 @@ async function pushToQueue(item: UpdateItemOutput, bucketName: string) {
       }),
       QueueUrl: queueUrl
     };
-    console.log("Should push to Q!")
+    console.log(`Should push to Q! ${queueUrl}`)
     const data = await sqsClient.send(new SendMessageCommand(params));
     console.log("Success, message sent. MessageID:", data.MessageId);
     return data; // For unit tests.
