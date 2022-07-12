@@ -41,7 +41,7 @@ async function getObjectFrom(bucket: string, key: string): Promise<GetObjectComm
   }))
 }
 
-async function updateStatus(requestId: string): Promise<UpdateItemCommandOutput> {
+async function updateStatus(requestId: string, status: string): Promise<UpdateItemCommandOutput> {
   const params: UpdateItemCommandInput = {
     TableName: tableName,
     Key: {
@@ -54,7 +54,7 @@ async function updateStatus(requestId: string): Promise<UpdateItemCommandOutput>
     },
     ExpressionAttributeValues: {
       ":newChangeMadeAt": { S: new Date().toISOString() },
-      ":state": { S: "ZIPPING" },
+      ":state": { S: status },
     },
   };
 
@@ -109,13 +109,13 @@ export const handler = async function (event: SQSEvent) {
   return await Promise.all(event.Records.map(async (record) => {
     console.log(JSON.parse(record.body))
     const { requestId, bucketName, prefix } = JSON.parse(record.body)
-    const statusPromise = updateStatus(requestId)
+    await updateStatus(requestId, "ZIPPING")
     const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
     console.time("Uploading")
     await putObjectTo(bucketName, targetKey, archiveBuffer);
     console.timeEnd("Uploading")
-    await statusPromise // not critical
+    await updateStatus(requestId, "DONE")
   }))
     .then(() => {
       return toLambdaOutput(200, "Finished zipping")
