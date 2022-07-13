@@ -135,11 +135,25 @@ export class HeicToJpgStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     })
 
+    const converterQueue = new sqs.Queue(this, "ConverterQueue", {
+      removalPolicy: RemovalPolicy.DESTROY
+    })
+
     const converterLambda = createNodeArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
       "QUEUE_URL": archiveQueue.queueUrl,
     }, Duration.seconds(30), 1024)
+
+    bucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED_PUT,
+      new s3n.SqsDestination(converterQueue),
+      {
+        prefix: 'OriginalImages'
+      }
+    )
+
+    converterQueue.grantConsumeMessages(converterLambda)
 
     const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
@@ -169,19 +183,19 @@ export class HeicToJpgStack extends Stack {
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)
 
-    bucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED_PUT,
-      new s3n.LambdaDestination(converterLambda),
-      {
-        prefix: 'OriginalImages'
-      }
-    )
+    // bucket.addEventNotification(
+    //   s3.EventType.OBJECT_CREATED_PUT,
+    //   new s3n.LambdaDestination(converterLambda),
+    //   {
+    //     prefix: 'OriginalImages'
+    //   }
+    // )
 
     const requestCanary = createNodeArmLambda(this, "RequestsCanaryLambda", canariesPath + '/requests', {
       "REQUESTS_API_URL": requestsApi.url,
     })
 
-    new Rule(this, 'Rule', {
+    new Rule(this, 'requestCanaryRule', {
       schedule: Schedule.rate(Duration.minutes(1)),
       targets: [new LambdaFunction(requestCanary)],
     });
