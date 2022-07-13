@@ -154,6 +154,7 @@ export class HeicToJpgStack extends Stack {
     )
 
     converterQueue.grantConsumeMessages(converterLambda)
+    converterLambda.addEventSource(new SqsEventSource(converterQueue))
 
     const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
@@ -195,7 +196,7 @@ export class HeicToJpgStack extends Stack {
       "REQUESTS_API_URL": requestsApi.url,
     })
 
-    new Rule(this, 'requestCanaryRule', {
+    new Rule(this, 'CanaryRule', {
       schedule: Schedule.rate(Duration.minutes(1)),
       targets: [new LambdaFunction(requestCanary)],
     });
