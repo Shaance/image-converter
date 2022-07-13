@@ -1,30 +1,18 @@
-import fetch from 'node-fetch';
+import { get } from 'request'
 
 const url = process.env.REQUESTS_API_URL as string;
 
 async function getRequest() {
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error! status: ${response.status}`);
+  get(url, { json: true }, (err, res) => {
+    if (err) {
+      console.log(err);
+      throw new Error(`Error! status: ${err.status}`);
     }
 
-    const result = (await response.json());
-    console.log('result is: ', JSON.stringify(result, null, 4));
-
-    return result;
-  } catch (error) {
-    console.log('error: ', error);
-    throw error
-  }
+    console.log(res.body)
+  });
 }
 
-export const handler = async() => {
-  return getRequest()
+export const handler = async () => {
+  await getRequest()
 }

@@ -12,7 +12,6 @@ import {
   RemovalPolicy,
 } from 'aws-cdk-lib';
 
-// import { Canary, Schedule, Test, Code, Runtime } from '@aws-cdk/aws-synthetics-alpha'
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
