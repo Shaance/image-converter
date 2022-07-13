@@ -25,4 +25,4 @@ async function getRequest() {
   }
 }
 
-await (getRequest)()
+(async()=> getRequest())()
