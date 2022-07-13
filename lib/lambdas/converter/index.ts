@@ -212,6 +212,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
 export const handler = async function (event: S3Event) {
   try {
     await Promise.all(event.Records.map((record) => {
+      console.log(record)
       return convertFromS3(record.s3)
     }))
   } catch (err) {
