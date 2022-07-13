@@ -25,4 +25,6 @@ async function getRequest() {
   }
 }
 
-(async()=> getRequest())()
+export const handler = async() => {
+  return getRequest()
+}
