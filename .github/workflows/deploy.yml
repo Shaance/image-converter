@@ -21,18 +21,8 @@ jobs:
           aws-region: eu-west-1
       - name: Installing depedencies
         run: npm i
-      - name: Installing converter lambda dependencies
-        run: npm i --prefix ./lib/lambdas/converter
-      - name: Installing pre-sign lambda dependencies
-        run: npm i --prefix ./lib/lambdas/pre-sign
-      - name: Installing status lambda dependencies
-        run: npm i --prefix ./lib/lambdas/status
-      - name: Installing zipper lambda dependencies
-        run: npm i --prefix ./lib/lambdas/zipper
-      - name: Installing requests lambda dependencies
-        run: npm i --prefix ./lib/lambdas/requests
-      - name: Installing requests canary dependencies
-        run: npm i --prefix ./lib/canaries/requests
+      - name: Installing lambda and canaries dependencies
+        run: npm run install:deps
       - name: Run the tests
         run: npm test
       - name: Deploy
