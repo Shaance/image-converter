@@ -6,6 +6,6 @@ node_modules
 # CDK asset staging directory
 .cdk.staging
 cdk.out
-response*
-local-*
+scripts/response*
+scripts/local-*
 .DS_Store
