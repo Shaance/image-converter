@@ -188,9 +188,17 @@ export class HeicToJpgStack extends Stack {
       "REQUESTS_API_URL": requestsApi.url,
     })
 
+    const statusCanary = createNodeArmLambda(this, "StatusCanaryLambda", canariesPath + '/status', {
+      "REQUESTS_API_URL": requestsApi.url,
+      "STATUS_API_URL": statusApi.url,
+    })
+
     new Rule(this, 'CanaryRule', {
       schedule: Schedule.rate(Duration.minutes(1)),
-      targets: [new LambdaFunction(requestCanary)],
+      targets: [
+        new LambdaFunction(requestCanary),
+        new LambdaFunction(statusCanary),
+      ],
     });
   }
 }
