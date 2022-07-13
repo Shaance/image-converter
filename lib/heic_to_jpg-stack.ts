@@ -12,13 +12,15 @@ import {
   RemovalPolicy,
 } from 'aws-cdk-lib';
 
-import { Canary, Schedule, Test, Code, Runtime } from '@aws-cdk/aws-synthetics-alpha'
+// import { Canary, Schedule, Test, Code, Runtime } from '@aws-cdk/aws-synthetics-alpha'
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 
 function createRequestsTable(scope: Construct): Table {
   return new ddb.Table(scope, 'RequestsTable', {
@@ -92,7 +94,7 @@ function createImagesBucket(scope: Construct): s3.Bucket {
   });
 }
 
-function createNodeArmLambda(scope: Construct, name: string, codePath: string, environment?: {[key: string]: string}, timeout = Duration.seconds(3), memorySize = 128) {
+function createNodeArmLambda(scope: Construct, name: string, codePath: string, environment?: { [key: string]: string }, timeout = Duration.seconds(3), memorySize = 128) {
   return new lambda.Function(scope, name, {
     runtime: lambda.Runtime.NODEJS_16_X,
     architecture: lambda.Architecture.ARM_64,
@@ -129,7 +131,7 @@ export class HeicToJpgStack extends Stack {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     })
-    
+
     const archiveQueue = new sqs.Queue(this, "ArchiveQueue", {
       removalPolicy: RemovalPolicy.DESTROY
     })
@@ -176,16 +178,13 @@ export class HeicToJpgStack extends Stack {
       }
     )
 
-    new Canary(this, 'RequestsCanary', {
+    const requestCanary = createNodeArmLambda(this, "RequestsCanaryLambda", canariesPath + '/requests', {
+      "REQUESTS_URL": requestsApi.url,
+    })
+
+    new Rule(this, 'Rule', {
       schedule: Schedule.rate(Duration.minutes(1)),
-      test: Test.custom({
-        code: Code.fromAsset(canariesPath + 'requests'),
-        handler: 'index.handler',
-      }),
-      runtime: Runtime.SYNTHETICS_NODEJS_PUPPETEER_3_5,
-      environmentVariables: {
-        "REQUESTS_URL": requestsApi.url,
-      },
+      targets: [new LambdaFunction(requestCanary)],
     });
   }
 }
