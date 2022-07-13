@@ -9,3 +9,4 @@ cdk.out
 scripts/response*
 scripts/local-*
 .DS_Store
+!npm-install-recursive.js

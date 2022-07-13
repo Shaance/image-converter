@@ -10,7 +10,7 @@
     "test": "jest",
     "cdk": "cdk",
     "deploy": "npm run build && npm run cdk deploy",
-    "install:deps": "./node_install.sh"
+    "install:deps": "node npm-install-recursive.js"
   },
   "devDependencies": {
     "@types/jest": "^27.5.2",
