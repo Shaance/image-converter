@@ -110,6 +110,7 @@ export class HeicToJpgStack extends Stack {
     super(scope, id, props);
 
     const lambdasPath = './lib/lambdas/';
+    const canarysPath = './lib/canarys/';
     const bucket = createImagesBucket(this)
     const table = createRequestsTable(this)
 
@@ -178,7 +179,7 @@ export class HeicToJpgStack extends Stack {
     new Canary(this, 'RequestsCanary', {
       schedule: Schedule.rate(Duration.minutes(1)),
       test: Test.custom({
-        code: Code.fromAsset('./canarys/requests'),
+        code: Code.fromAsset(canarysPath + 'requests'),
         handler: 'index.handler',
       }),
       runtime: Runtime.SYNTHETICS_NODEJS_PUPPETEER_3_5,
