@@ -1,11 +1,15 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 
-export interface S3Event extends APIGatewayProxyEvent {
-  Records: S3EventRecord[]
+export interface S3SQSEvent extends APIGatewayProxyEvent {
+  Records: S3SQSEventRecord[]
 }
 
-interface S3EventRecord {
-  s3: S3EventRecordDetail // more than that
+interface S3SQSEventRecord {
+  body: string
+}
+
+export interface S3EventRecord {
+  s3: S3EventRecordDetail
 }
 
 export interface S3EventRecordDetail {
