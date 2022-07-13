@@ -31,6 +31,8 @@ jobs:
         run: npm i --prefix ./lib/lambdas/zipper
       - name: Installing requests lambda dependencies
         run: npm i --prefix ./lib/lambdas/requests
+      - name: Installing requests canary dependencies
+        run: npm i --prefix ./lib/canarys/requests
       - name: Run the tests
         run: npm test
       - name: Deploy
