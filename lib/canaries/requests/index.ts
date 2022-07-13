@@ -1,4 +1,4 @@
-import { get } from 'request'
+const axios = require('axios').default;
 
 const url = process.env.REQUESTS_API_URL as string;
 
@@ -14,13 +14,15 @@ function toLambdaOutput(statusCode: number, body: any) {
 }
 
 async function getRequest() {
-  get(url + '?nbFiles=5', { json: true }, (err, res) => {
-    if (err) {
-      throw new Error(`Error! status: ${err.status}`);
-    }
-
-    console.log(res.body)
-  });
+  await axios
+    .get(url + '?nbFiles=5')
+    .then((res: any) => {
+      console.log(res.data);
+    })
+    .catch((error: any) => {
+      console.error(error);
+      throw new Error(`Error! ${error.status}`);
+    });
 }
 
 export const handler = async () => {

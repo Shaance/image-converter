@@ -9,10 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/request": "^2.48.8",
-    "request": "^2.88.2"
+    "axios": "^0.27.2"
   },
   "devDependencies": {
-    "@types/node-fetch": "^2.6.2"
+    "@types/axios": "^0.14.0"
   }
 }
