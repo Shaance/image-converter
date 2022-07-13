@@ -154,7 +154,7 @@ export class HeicToJpgStack extends Stack {
     )
 
     converterQueue.grantConsumeMessages(converterLambda)
-    converterLambda.addEventSource(new SqsEventSource(converterQueue))
+    converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
 
     const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
@@ -183,14 +183,6 @@ export class HeicToJpgStack extends Stack {
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)
-
-    // bucket.addEventNotification(
-    //   s3.EventType.OBJECT_CREATED_PUT,
-    //   new s3n.LambdaDestination(converterLambda),
-    //   {
-    //     prefix: 'OriginalImages'
-    //   }
-    // )
 
     const requestCanary = createNodeArmLambda(this, "RequestsCanaryLambda", canariesPath + '/requests', {
       "REQUESTS_API_URL": requestsApi.url,
