@@ -192,12 +192,18 @@ export class HeicToJpgStack extends Stack {
       "REQUESTS_API_URL": requestsApi.url,
       "STATUS_API_URL": statusApi.url,
     })
+    
+    const presignCanary = createNodeArmLambda(this, "PresignCanaryLambda", canariesPath + '/pre-sign', {
+      "REQUESTS_API_URL": requestsApi.url,
+      "PRESIGN_API_URL": preSignApi.url,
+    })
 
     new Rule(this, 'CanaryRule', {
       schedule: Schedule.rate(Duration.minutes(1)),
       targets: [
         new LambdaFunction(requestCanary),
         new LambdaFunction(statusCanary),
+        new LambdaFunction(presignCanary),
       ],
     });
   }
