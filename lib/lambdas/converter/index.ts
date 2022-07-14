@@ -59,6 +59,26 @@ async function getRequestItem(requestId: string, projectionExpression: string, c
   return ddbClient.send(new GetItemCommand(params))
 }
 
+async function updateStatus(requestId: string, status: string): Promise<UpdateItemCommandOutput> {
+  const params: UpdateItemCommandInput = {
+    TableName: tableName,
+    Key: {
+      requestId: { S: requestId },
+    },
+    UpdateExpression: "SET #updatedAt = :newChangeMadeAt, #state = :state",
+    ExpressionAttributeNames: {
+      "#updatedAt" : "modifiedAt",
+      "#state" : "state",
+    },
+    ExpressionAttributeValues: {
+      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":state": { S: status },
+    },
+  };
+
+  return ddbClient.send(new UpdateItemCommand(params))
+}
+
 async function updateCount(requestId: string, countAttribute: string, returnValues: string, retriesLeft = 15, delay = 25): Promise<UpdateItemCommandOutput> {
   if (retriesLeft < 1) {
     retriesLeft = 1
@@ -191,22 +211,27 @@ async function convertFromS3(record: S3EventRecordDetail) {
   const key = record.object.key;
   const requestId = key.split('/')[1]
 
-  await updateCount(requestId, "uploadedFiles", "NONE")
+  try {
+    await updateCount(requestId, "uploadedFiles", "NONE")
+    
+    const object = await getObjectFrom(bucket, key)
+    const targetMime = object.Metadata!["target-mime"];
+    const originalName = object.Metadata!["original-name"];
+    const buffer = await toArrayBuffer(object.Body as Readable)
+    
+    console.time(`Conversion-${conversionId}`)
+    const outputBuffer = await convert({
+      buffer: buffer,
+      format: toHeicConvertTargetFormat(targetMime),
+      quality: 1
+    });
+    console.timeEnd(`Conversion-${conversionId}`)
   
-  const object = await getObjectFrom(bucket, key)
-  const targetMime = object.Metadata!["target-mime"];
-  const originalName = object.Metadata!["original-name"];
-  const buffer = await toArrayBuffer(object.Body as Readable)
-  
-  console.time(`Conversion-${conversionId}`)
-  const outputBuffer = await convert({
-    buffer: buffer,
-    format: toHeicConvertTargetFormat(targetMime),
-    quality: 1
-  });
-  console.timeEnd(`Conversion-${conversionId}`)
-
-  await uploadConvertedFile(key, bucket, targetMime, requestId, originalName, outputBuffer)
+    await uploadConvertedFile(key, bucket, targetMime, requestId, originalName, outputBuffer)
+  } catch (err) {
+    await updateStatus(requestId, "FAILED")
+    throw err
+  }
 }
 
 export const handler = async function (event: S3SQSEvent) {
