@@ -40,6 +40,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
   // API gateway already validated nbFiles presence in queryString
   const nbFiles = event.queryStringParameters!.nbFiles as string
+  const sourceIP = event.requestContext.requestId
   const errOutput = validateRequest(nbFiles)
   if (!!errOutput) {
     return errOutput
@@ -59,7 +60,8 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
       state: { S: "CREATED" },
       createdAt: { N: now },
       modifiedAt: { N: now },
-      expiresAt: { N: add(new Date(), { days: 2 }).getTime().toString()}
+      expiresAt: { N: add(new Date(), { days: 2 }).getTime().toString()},
+      sourceIP: { S: sourceIP }
     },
   };
 
