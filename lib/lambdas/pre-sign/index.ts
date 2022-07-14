@@ -2,7 +2,6 @@ import { PreSignAPIGatewayProxyEvent } from './@types/PreSignEvent';
 import { 
   S3Client,
   PutObjectCommand,
-  GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
@@ -16,16 +15,16 @@ import {
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
 } from "@aws-sdk/client-dynamodb";
-// import { add } from 'date-fns';
 
 const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
-const validTargetMimes = ['image/jpeg', 'image/png'];
-const validTargetMimesSet = new Set<string>(validTargetMimes);
 const tableName = process.env.TABLE_NAME as string;
-const ddbClient = new DynamoDBClient({ region });
+const validTargetMimes = ['image/jpeg', 'image/png'];
 const outOfRetries = "OutOfRetries"
 const maximumUrlGenerated = "MaxUrlReached"
+const validTargetMimesSet = new Set<string>(validTargetMimes);
+const ddbClient = new DynamoDBClient({ region });
+const s3Client = new S3Client({ region })
 
 function toExtension(fileName: string): string {
   return fileName.substring(fileName.lastIndexOf('.'))
@@ -133,43 +132,25 @@ export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
     
     const nameWithoutExtension = fileName!.substring(0, fileName!.lastIndexOf('.'));
     const extension = toExtension(fileName!);
-
-    const s3Client = new S3Client({ region: region })
-
-    const putParams = {
+    const putCommand = new PutObjectCommand({
       Bucket: bucketName,
       Key: `OriginalImages/${requestId}/${uuidv4()}${extension}`,
       Metadata: {
         "original-name": nameWithoutExtension,
         "target-mime": targetMime as string
       },
-      // Expires: add(new Date(), {
-      //   hours: 1
-      // })
-    }
-
-    const getParams = {
-      Bucket: bucketName,
-      Key: `Archives/${requestId}/converted.zip`,
-    }
-    const getCommand = new GetObjectCommand(getParams);
-    const putCommand = new PutObjectCommand(putParams);
-
-    // TODO SSE encryption
-    const getObjectSignedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 600 });
-    const putObjectSignedUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 600 });
-    const responseBody = {
-      getObjectSignedUrl,
-      putObjectSignedUrl,
-    }
+    });
 
     try {
+      const putObjectSignedUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 600 });
       await updatePresignUrlCount(requestId as string)
+      return toLambdaOutput(200, {
+        putObjectSignedUrl,
+      });
     } catch (err) {
       if (err === maximumUrlGenerated) {
         return toLambdaOutput(400, { errMessage: "Maximum urls generated"});
       }
-      return toLambdaOutput(500, { errMessage: "Internal Error"});
     }
-    return toLambdaOutput(200, responseBody);
+    return toLambdaOutput(500, { errMessage: "Internal Error"});
 }

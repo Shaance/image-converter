@@ -2,10 +2,22 @@ import { APIGatewayProxyEvent } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { add } from "date-fns"
+import { 
+  S3Client,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const region = process.env.REGION as string;
 const tableName = process.env.TABLE_NAME as string;
+const bucketName = process.env.BUCKET_NAME as string;
 const ddbClient = new DynamoDBClient({ region });
+const s3Client = new S3Client({ region })
+
+interface RequestAPIResponseBody {
+  requestId: string
+  getObjectSignedUrl: string
+}
 
 function toLambdaOutput(statusCode: number, body: any) {
   return {
@@ -36,18 +48,9 @@ function validateRequest(nbFiles: string) {
   return
 }
 
-export const handler = async (event: APIGatewayProxyEvent) =>  {
-  console.log(event)
-  // API gateway already validated nbFiles presence in queryString
+async function createRequestItem(event: APIGatewayProxyEvent, requestId: string) {
   const nbFiles = event.queryStringParameters!.nbFiles as string
   const sourceIP = event.requestContext.identity.sourceIp
-  const errOutput = validateRequest(nbFiles)
-  if (!!errOutput) {
-    return errOutput
-  }
-
-  const requestId = uuidv4()
-  console.log(`Generated uuid ${requestId}`)
   const now = new Date().getTime().toString()
   const params = {
     TableName: tableName,
@@ -65,13 +68,38 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
     },
   };
 
+  await ddbClient.send(new PutItemCommand(params));
+}
+
+async function handleRequestsRequest(event: APIGatewayProxyEvent): Promise<RequestAPIResponseBody> {
+  const requestId = uuidv4()
+  await createRequestItem(event, requestId)
+  const getCommand = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: `Archives/${requestId}/converted.zip`,
+  });
+  const getObjectSignedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 600 });
+  return {
+    requestId,
+    getObjectSignedUrl,
+  }
+}
+
+export const handler = async (event: APIGatewayProxyEvent) =>  {
+  console.log(event)
+  // API gateway already validated nbFiles presence in queryString
+  const nbFiles = event.queryStringParameters!.nbFiles as string
+  const errOutput = validateRequest(nbFiles)
+  if (!!errOutput) {
+    return errOutput
+  }
+
   try {
-    await ddbClient.send(new PutItemCommand(params));
+    const responseBody = await handleRequestsRequest(event)
+    return toLambdaOutput(200, responseBody)
   } catch (err) {
     // @ts-ignore
     console.log("Error", err.stack);
-    return toLambdaOutput(500, { errMessage: "Error while generating requestId" })  
+    return toLambdaOutput(500, { errMessage: "Error while generating requestId" })
   }
-
-  return toLambdaOutput(200, { requestId })
 }

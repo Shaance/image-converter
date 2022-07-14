@@ -117,6 +117,7 @@ export class HeicToJpgStack extends Stack {
 
     const requestsLambda = createNodeArmLambda(this, "RequestsLambda", lambdasPath + '/requests', {
       "TABLE_NAME": table.tableName,
+      "BUCKET_NAME": bucket.bucketName,
       "REGION": props?.env?.region as string,
     }, Duration.seconds(10))
 
@@ -180,6 +181,7 @@ export class HeicToJpgStack extends Stack {
     table.grantReadWriteData(converterLambda)
     table.grantReadWriteData(zipperLambda)
     table.grantReadData(statusLambda)
+    bucket.grantReadWrite(requestsLambda)
     bucket.grantReadWrite(presignLambda);
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)
