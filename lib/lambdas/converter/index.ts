@@ -206,7 +206,6 @@ async function uploadConvertedFile(key: string, bucket: string, targetMime: stri
 
 async function convertFromS3(record: S3EventRecordDetail) {
   console.log(record)
-  const conversionId = uuidv4()
   const bucket = record.bucket.name;
   const key = record.object.key;
   const requestId = key.split('/')[1]
@@ -218,15 +217,11 @@ async function convertFromS3(record: S3EventRecordDetail) {
     const targetMime = object.Metadata!["target-mime"];
     const originalName = object.Metadata!["original-name"];
     const buffer = await toArrayBuffer(object.Body as Readable)
-    
-    console.time(`Conversion-${conversionId}`)
     const outputBuffer = await convert({
       buffer: buffer,
       format: toHeicConvertTargetFormat(targetMime),
       quality: 1
     });
-    console.timeEnd(`Conversion-${conversionId}`)
-  
     await uploadConvertedFile(key, bucket, targetMime, requestId, originalName, outputBuffer)
   } catch (err) {
     await updateStatus(requestId, "FAILED")

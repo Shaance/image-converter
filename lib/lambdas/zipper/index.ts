@@ -100,9 +100,7 @@ async function addToZip(zip: JSZip, bucket: string, key: string) {
 async function archive(bucket: string, prefix: string): Promise<Buffer> {
   const listObjResult = await listObjects(bucket, prefix)
   const zip = new JSZip();
-  console.time('archive')
   await Promise.all(listObjResult.Contents!!.map(c => addToZip(zip, bucket, c.Key as string)));
-  console.timeEnd('archive')
   return toArrayBuffer(zip.generateNodeStream())
 }
 
@@ -114,9 +112,7 @@ async function handleArchiveRequest(record: SQSEventRecord) {
     await updateStatus(requestId, "ZIPPING")
     const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
-    console.time(`Uploading-${requestId}`)
     await putObjectTo(bucketName, targetKey, archiveBuffer);
-    console.timeEnd(`Uploading-${requestId}`)
     await updateStatus(requestId, "DONE")
   } catch (err) {
     await updateStatus(requestId, "FAILED")
