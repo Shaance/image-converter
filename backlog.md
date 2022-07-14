@@ -1,10 +1,14 @@
-- use s3 SSE encryption
-- use DDB to track status instead of file based stuff
-- use DDB to count and limit 200 max files per request
-- Add lambda to generate request uuid and store it somehow
-- make presign lambda check if requestId is a valid one
-- change getStatus to a GET request with query param
-- TTL of DDB and S3
-- 1 request per IP, rate limit
-- CORS to localhost:3000 (look at strategies here) + own url when hosted
-- requests validation from API gateway
+- 1 active request per IP? => adapt canary tests
+- CORS? Need to do some research
+- canary tests
+  - convert
+  - zipper
+- GSI (PK: IP, sort key: createdAt) to soft limit number of requests per day? (100?)
+- global rate limiting per IP probably through WAF which sits in front of API gateway   
+  - has to be complementary with GSI as WAF min threshold to start block is 100 requests per 5 min
+  - benefits:
+    - WAF blocks the requests and lambdas don't have to take the load (only 1000 max concurrent exec per account per region)
+    - WAF also has managed rules which prevents us from common vulnerabilities: https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-baseline.html 
+- unit tests
+- integ tests
+- shared layers for common code
