@@ -30,6 +30,9 @@ async function getRequestItem(requestId: string): Promise<GetItemCommandOutput> 
 
 async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
   const requestItem = await getRequestItem(requestId)
+  if (!requestItem.Item) {
+    throw new Error(`RequestId ${requestId} is invalid`)
+  }
   const uploadedFiles = Number(requestItem.Item?.uploadedFiles.N!)
   const convertedFiles = Number(requestItem.Item?.convertedFiles.N!)
   const state = requestItem.Item?.state.S!
@@ -58,6 +61,10 @@ export const handler = async (event: StatusAPIGatewayProxyEvent) => {
   console.log(event)
 
   let requestId = event.queryStringParameters?.requestId as string;
-  const status = await getStatus(requestId)
-  return toLambdaOutput(200, status);
+  try {
+    const status = await getStatus(requestId)
+    return toLambdaOutput(200, status);
+  } catch (err) {
+    return toLambdaOutput(400, err);
+  }
 }
