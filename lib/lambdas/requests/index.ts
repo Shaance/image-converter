@@ -47,7 +47,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
 
   const requestId = uuidv4()
   console.log(`Generated uuid ${requestId}`)
-  
+  const now = new Date().getTime().toString()
   const params = {
     TableName: tableName,
     Item: {
@@ -57,8 +57,8 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
       uploadedFiles: { N: "0" },
       convertedFiles: { N: "0" },
       state: { S: "CREATED" },
-      createdAt: { S: new Date().toISOString() },
-      modifiedAt: { S: new Date().toISOString() },
+      createdAt: { N: now },
+      modifiedAt: { N: now },
       expiresAt: { N: add(new Date(), { days: 2 }).getTime().toString()}
     },
   };

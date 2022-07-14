@@ -68,7 +68,7 @@ async function updateCount(requestId: string, countAttribute: string, returnValu
   }
 
   const requestItem = (await getRequestItem(requestId, "modifiedAt")).Item
-  const modifiedAt = requestItem?.modifiedAt.S
+  const modifiedAt = requestItem?.modifiedAt.N
 
   const params: UpdateItemCommandInput = {
     TableName: tableName,
@@ -83,8 +83,8 @@ async function updateCount(requestId: string, countAttribute: string, returnValu
     },
     ExpressionAttributeValues: {
       ":n" : { N: "1" },
-      ":newChangeMadeAt": { S: new Date().toISOString() },
-      ":modifiedAtFromItem": { S: modifiedAt as string },
+      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":modifiedAtFromItem": { N: modifiedAt as string },
       ":state": { S: "CONVERTING" },
     },
     ConditionExpression: "#updatedAt = :modifiedAtFromItem",

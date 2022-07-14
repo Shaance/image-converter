@@ -53,7 +53,7 @@ async function updateStatus(requestId: string, status: string): Promise<UpdateIt
       "#state" : "state",
     },
     ExpressionAttributeValues: {
-      ":newChangeMadeAt": { S: new Date().toISOString() },
+      ":newChangeMadeAt": { N: new Date().getTime().toString() },
       ":state": { S: status },
     },
   };

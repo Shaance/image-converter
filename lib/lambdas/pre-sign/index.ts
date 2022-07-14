@@ -71,7 +71,7 @@ async function updatePresignUrlCount(requestId: string, retriesLeft = 15, delay 
   }
 
   const requestItem = (await getRequestItem(requestId, "modifiedAt, presignedUrls, nbFiles", true)).Item
-  const modifiedAt = requestItem?.modifiedAt.S
+  const modifiedAt = requestItem?.modifiedAt.N
   const presignedUrls = Number(requestItem?.presignedUrls.N as string)
   const nbFiles = Number(requestItem?.nbFiles.N as string)
   if (presignedUrls > nbFiles) {
@@ -90,8 +90,8 @@ async function updatePresignUrlCount(requestId: string, retriesLeft = 15, delay 
     },
     ExpressionAttributeValues: {
       ":n" : { N: "1" },
-      ":newChangeMadeAt": { S: new Date().toISOString() },
-      ":modifiedAtFromItem": { S: modifiedAt as string },
+      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":modifiedAtFromItem": { N: modifiedAt as string },
     },
     ConditionExpression: "#updatedAt = :modifiedAtFromItem",
   };
