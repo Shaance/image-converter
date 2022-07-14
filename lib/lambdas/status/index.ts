@@ -65,6 +65,7 @@ export const handler = async (event: StatusAPIGatewayProxyEvent) => {
     const status = await getStatus(requestId)
     return toLambdaOutput(200, status);
   } catch (err) {
+    console.log(err)
     return toLambdaOutput(400, err);
   }
 }
