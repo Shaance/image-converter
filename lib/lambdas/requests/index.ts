@@ -40,7 +40,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
   console.log(event)
   // API gateway already validated nbFiles presence in queryString
   const nbFiles = event.queryStringParameters!.nbFiles as string
-  const sourceIP = event.requestContext.requestId
+  const sourceIP = event.requestContext.identity.sourceIp
   const errOutput = validateRequest(nbFiles)
   if (!!errOutput) {
     return errOutput
