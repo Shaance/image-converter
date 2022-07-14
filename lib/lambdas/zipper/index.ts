@@ -109,7 +109,7 @@ async function archive(bucket: string, prefix: string): Promise<Buffer> {
 async function handleArchiveRequest(record: SQSEventRecord) {
   const recordBody = JSON.parse(record.body)
   console.log(recordBody)
-  const { requestId, bucketName, prefix } = JSON.parse(recordBody)
+  const { requestId, bucketName, prefix } = recordBody
   try {
     await updateStatus(requestId, "ZIPPING")
     const archiveBuffer = await archive(bucketName, prefix);
