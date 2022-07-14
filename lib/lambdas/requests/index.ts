@@ -59,7 +59,7 @@ export const handler = async (event: APIGatewayProxyEvent) =>  {
       state: { S: "CREATED" },
       createdAt: { S: new Date().toISOString() },
       modifiedAt: { S: new Date().toISOString() },
-      expiresAt: { S: add(new Date(), { days: 2 }).toISOString()}
+      expiresAt: { N: add(new Date(), { days: 2 }).getTime().toString()}
     },
   };
 
