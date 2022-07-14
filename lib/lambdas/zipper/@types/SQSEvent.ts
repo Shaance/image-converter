@@ -4,6 +4,6 @@ export interface SQSEvent extends APIGatewayProxyEvent {
   Records: SQSEventRecord[]
 }
 
-interface SQSEventRecord {
+export interface SQSEventRecord {
   body: string
 }

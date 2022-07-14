@@ -1,4 +1,4 @@
-import { SQSEvent } from "./@types/SQSEvent";
+import { SQSEvent, SQSEventRecord } from "./@types/SQSEvent";
 
 import {
   S3Client,
@@ -9,7 +9,8 @@ import {
   PutObjectCommandOutput,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
-import { DynamoDBClient,
+import {
+  DynamoDBClient,
   UpdateItemCommand,
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
@@ -49,8 +50,8 @@ async function updateStatus(requestId: string, status: string): Promise<UpdateIt
     },
     UpdateExpression: "SET #updatedAt = :newChangeMadeAt, #state = :state",
     ExpressionAttributeNames: {
-      "#updatedAt" : "modifiedAt",
-      "#state" : "state",
+      "#updatedAt": "modifiedAt",
+      "#state": "state",
     },
     ExpressionAttributeValues: {
       ":newChangeMadeAt": { N: new Date().getTime().toString() },
@@ -105,23 +106,33 @@ async function archive(bucket: string, prefix: string): Promise<Buffer> {
   return toArrayBuffer(zip.generateNodeStream())
 }
 
-export const handler = async function (event: SQSEvent) {
-  return await Promise.all(event.Records.map(async (record) => {
-    console.log(JSON.parse(record.body))
-    const { requestId, bucketName, prefix } = JSON.parse(record.body)
+async function handleArchiveRequest(record: SQSEventRecord) {
+  const recordBody = JSON.parse(record.body)
+  console.log(recordBody)
+  const { requestId, bucketName, prefix } = JSON.parse(recordBody)
+  try {
     await updateStatus(requestId, "ZIPPING")
     const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
-    console.time("Uploading")
+    console.time(`Uploading-${requestId}`)
     await putObjectTo(bucketName, targetKey, archiveBuffer);
-    console.timeEnd("Uploading")
+    console.timeEnd(`Uploading-${requestId}`)
     await updateStatus(requestId, "DONE")
-  }))
-    .then(() => {
-      return toLambdaOutput(200, "Finished zipping")
-    })
-    .catch(err => {
-      console.log(err);
-      return toLambdaOutput(500, "Error while zipping")
-    })
+  } catch (err) {
+    await updateStatus(requestId, "FAILED")
+    throw err
+  }
+}
+
+export const handler = async function (event: SQSEvent) {
+  try {
+    await Promise.all(event.Records.map(async (record) => 
+      handleArchiveRequest(record)
+    ))
+  } catch (err) {
+    console.log(err);
+    return toLambdaOutput(500, "Error while zipping")
+  }
+
+  return toLambdaOutput(200, "Finished zipping")
 }
