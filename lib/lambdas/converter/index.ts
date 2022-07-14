@@ -18,7 +18,6 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import  { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Readable } from "stream";
-import { v4 as uuidv4 } from 'uuid';
 import { add } from 'date-fns'
 
 const convert = require("heic-convert")
