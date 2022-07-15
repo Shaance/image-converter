@@ -8,6 +8,7 @@ import {
   aws_dynamodb as ddb,
   aws_apigateway as api_gateway,
   aws_sqs as sqs,
+  aws_sns as sns,
   Duration,
   RemovalPolicy,
 } from 'aws-cdk-lib';
@@ -17,7 +18,7 @@ import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { LambdaRestApi } from 'aws-cdk-lib/aws-apigateway';
-import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import { SnsEventSource, SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 
@@ -93,9 +94,8 @@ function createImagesBucket(scope: Construct): s3.Bucket {
   });
 }
 
-function createNodeArmLambda(scope: Construct, name: string, codePath: string, environment?: { [key: string]: string }, timeout = Duration.seconds(3), memorySize = 128) {
+function createArmLambda(scope: Construct, name: string, codePath: string, environment?: { [key: string]: string }, timeout = Duration.seconds(3), memorySize = 128, runtime = lambda.Runtime.NODEJS_16_X) {
   return new lambda.Function(scope, name, {
-    runtime: lambda.Runtime.NODEJS_16_X,
     architecture: lambda.Architecture.ARM_64,
     handler: 'index.handler',
     logRetention: logs.RetentionDays.ONE_DAY,
@@ -103,6 +103,7 @@ function createNodeArmLambda(scope: Construct, name: string, codePath: string, e
     timeout,
     environment,
     memorySize,
+    runtime,
   });
 }
 
@@ -115,19 +116,19 @@ export class HeicToJpgStack extends Stack {
     const bucket = createImagesBucket(this)
     const table = createRequestsTable(this)
 
-    const requestsLambda = createNodeArmLambda(this, "RequestsLambda", lambdasPath + '/requests', {
+    const requestsLambda = createArmLambda(this, "RequestsLambda", lambdasPath + '/requests', {
       "TABLE_NAME": table.tableName,
       "BUCKET_NAME": bucket.bucketName,
       "REGION": props?.env?.region as string,
     }, Duration.seconds(10))
 
-    const presignLambda = createNodeArmLambda(this, "PreSignLambda", lambdasPath + '/pre-sign', {
+    const presignLambda = createArmLambda(this, "PreSignLambda", lambdasPath + '/pre-sign', {
       "BUCKET_NAME": bucket.bucketName,
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     })
 
-    const statusLambda = createNodeArmLambda(this, "StatusLambda", lambdasPath + '/status', {
+    const statusLambda = createArmLambda(this, "StatusLambda", lambdasPath + '/status', {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     })
@@ -140,11 +141,19 @@ export class HeicToJpgStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     })
 
-    const converterLambda = createNodeArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
+    const converterTopic = new sns.Topic(this, "ConverterTopic")
+
+    const converterLambda = createArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
       "QUEUE_URL": archiveQueue.queueUrl,
     }, Duration.seconds(30), 1024)
+
+    // const goConverterLambda = createArmLambda(this, "GoConverterLambda", lambdasPath + '/go-converter', {
+    //   "REGION": props?.env?.region as string,
+    //   "TABLE_NAME": table.tableName,
+    //   "QUEUE_URL": archiveQueue.queueUrl,
+    // }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
 
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
@@ -154,10 +163,20 @@ export class HeicToJpgStack extends Stack {
       }
     )
 
+    bucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED_PUT,
+      new s3n.SnsDestination(converterTopic),
+      {
+        prefix: 'OriginalImages'
+      }
+    )
+
     converterQueue.grantConsumeMessages(converterLambda)
     converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
+    converterLambda.addEventSource(new SnsEventSource(converterTopic))
+    // goConverterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
 
-    const zipperLambda = createNodeArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
+    const zipperLambda = createArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
     }, Duration.seconds(30), 2048)
@@ -186,16 +205,16 @@ export class HeicToJpgStack extends Stack {
     bucket.grantReadWrite(converterLambda);
     bucket.grantReadWrite(zipperLambda)
 
-    const requestCanary = createNodeArmLambda(this, "RequestsCanaryLambda", canariesPath + '/requests', {
+    const requestCanary = createArmLambda(this, "RequestsCanaryLambda", canariesPath + '/requests', {
       "REQUESTS_API_URL": requestsApi.url,
     })
 
-    const statusCanary = createNodeArmLambda(this, "StatusCanaryLambda", canariesPath + '/status', {
+    const statusCanary = createArmLambda(this, "StatusCanaryLambda", canariesPath + '/status', {
       "REQUESTS_API_URL": requestsApi.url,
       "STATUS_API_URL": statusApi.url,
     })
     
-    const presignCanary = createNodeArmLambda(this, "PresignCanaryLambda", canariesPath + '/pre-sign', {
+    const presignCanary = createArmLambda(this, "PresignCanaryLambda", canariesPath + '/pre-sign', {
       "REQUESTS_API_URL": requestsApi.url,
       "PRESIGN_API_URL": preSignApi.url,
     })
