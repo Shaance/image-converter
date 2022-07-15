@@ -230,6 +230,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
 
 export const handler = async function (event: S3SQSEvent) {
   // batch size 1
+  console.log(event)
   const records: S3EventRecord[] = JSON.parse(event.Records[0].body).Records
   try {
     await Promise.all(records.map((record) => {
