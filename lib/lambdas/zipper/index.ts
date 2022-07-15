@@ -1,5 +1,3 @@
-import { SQSEvent, SQSEventRecord } from "./@types/SQSEvent";
-
 import {
   S3Client,
   ListObjectsV2Command,
@@ -18,6 +16,7 @@ import {
 import { Readable, Stream } from "stream";
 import * as JSZip from "jszip";
 import { add } from "date-fns";
+import { SQSEvent, SQSRecord } from 'aws-lambda';
 
 const region = process.env.REGION as string;
 const s3Client = new S3Client({ region });
@@ -104,7 +103,7 @@ async function archive(bucket: string, prefix: string): Promise<Buffer> {
   return toArrayBuffer(zip.generateNodeStream())
 }
 
-async function handleArchiveRequest(record: SQSEventRecord) {
+async function handleArchiveRequest(record: SQSRecord) {
   const recordBody = JSON.parse(record.body)
   console.log(recordBody)
   const { requestId, bucketName, prefix } = recordBody

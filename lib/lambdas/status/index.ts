@@ -1,5 +1,5 @@
 import { DynamoDBClient, GetItemCommand, GetItemCommandInput, GetItemCommandOutput } from '@aws-sdk/client-dynamodb';
-import { StatusAPIGatewayProxyEvent } from './@types/StatusAPIEvent';
+import { APIGatewayProxyEvent, APIGatewayProxyResultV2 } from 'aws-lambda';
 
 const region = process.env.REGION as string;
 const tableName = process.env.TABLE_NAME as string;
@@ -44,7 +44,7 @@ async function getStatus(requestId: string): Promise<ConversionStatusDetail> {
   }
 }
 
-function toLambdaOutput(statusCode: number, body: any) {
+function toLambdaOutput(statusCode: number, body: any): APIGatewayProxyResultV2 {
   return {
     statusCode,
     headers: {
@@ -57,7 +57,7 @@ function toLambdaOutput(statusCode: number, body: any) {
   };
 }
 
-export const handler = async (event: StatusAPIGatewayProxyEvent) => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResultV2> => {
   console.log(event)
 
   let requestId = event.queryStringParameters?.requestId as string;

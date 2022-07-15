@@ -1,4 +1,4 @@
-import { APIGatewayProxyEvent } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { add } from "date-fns"
@@ -19,7 +19,7 @@ interface RequestAPIResponseBody {
   getObjectSignedUrl: string
 }
 
-function toLambdaOutput(statusCode: number, body: any) {
+function toLambdaOutput(statusCode: number, body: any): APIGatewayProxyResultV2 {
   return {
     statusCode,
     headers: {
@@ -85,7 +85,7 @@ async function handleRequestsRequest(event: APIGatewayProxyEvent): Promise<Reque
   }
 }
 
-export const handler = async (event: APIGatewayProxyEvent) =>  {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResultV2> => {
   console.log(event)
   // API gateway already validated nbFiles presence in queryString
   const nbFiles = event.queryStringParameters!.nbFiles as string
