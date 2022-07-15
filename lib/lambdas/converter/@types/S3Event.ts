@@ -5,7 +5,7 @@ export interface S3SNSEvent extends APIGatewayProxyEvent {
 }
 
 interface S3SNSEventRecord {
-  SNS: Record<"Message", string>
+  Sns: Record<"Message", string>
 }
 
 export interface S3EventRecord {
