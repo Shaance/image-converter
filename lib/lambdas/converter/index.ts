@@ -1,4 +1,4 @@
-import { S3SQSEvent, S3EventRecordDetail, S3EventRecord } from "./@types/S3Event";
+import { S3SNSEvent, S3EventRecordDetail, S3EventRecord } from "./@types/S3Event";
 import {
   S3Client,
   GetObjectCommand,
@@ -228,10 +228,11 @@ async function convertFromS3(record: S3EventRecordDetail) {
   }
 }
 
-export const handler = async function (event: S3SQSEvent) {
+export const handler = async function (event: S3SNSEvent) {
   // batch size 1
   console.log(event)
-  const records: S3EventRecord[] = JSON.parse(event.Records[0].body).Records
+  console.log(event.Records[0].SNS)
+  const records: S3EventRecord[] = JSON.parse(event.Records[0].SNS.Message).Records
   try {
     await Promise.all(records.map((record) => {
       return convertFromS3(record.s3)
