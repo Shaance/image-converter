@@ -137,9 +137,9 @@ export class HeicToJpgStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     })
 
-    const converterQueue = new sqs.Queue(this, "ConverterQueue", {
-      removalPolicy: RemovalPolicy.DESTROY
-    })
+    // const converterQueue = new sqs.Queue(this, "ConverterQueue", {
+    //   removalPolicy: RemovalPolicy.DESTROY
+    // })
 
     const converterTopic = new sns.Topic(this, "ConverterTopic")
 
@@ -155,13 +155,13 @@ export class HeicToJpgStack extends Stack {
     //   "QUEUE_URL": archiveQueue.queueUrl,
     // }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
 
-    bucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED_PUT,
-      new s3n.SqsDestination(converterQueue),
-      {
-        prefix: 'OriginalImages'
-      }
-    )
+    // bucket.addEventNotification(
+    //   s3.EventType.OBJECT_CREATED_PUT,
+    //   new s3n.SqsDestination(converterQueue),
+    //   {
+    //     prefix: 'OriginalImages'
+    //   }
+    // )
 
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
@@ -171,8 +171,8 @@ export class HeicToJpgStack extends Stack {
       }
     )
 
-    converterQueue.grantConsumeMessages(converterLambda)
-    converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
+    // converterQueue.grantConsumeMessages(converterLambda)
+    // converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
     converterLambda.addEventSource(new SnsEventSource(converterTopic))
     // goConverterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
 
