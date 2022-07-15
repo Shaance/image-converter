@@ -137,10 +137,6 @@ export class HeicToJpgStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     })
 
-    // const converterQueue = new sqs.Queue(this, "ConverterQueue", {
-    //   removalPolicy: RemovalPolicy.DESTROY
-    // })
-
     const converterTopic = new sns.Topic(this, "ConverterTopic")
 
     const converterLambda = createArmLambda(this, "ConvertLambda", lambdasPath + '/converter', {
@@ -155,14 +151,6 @@ export class HeicToJpgStack extends Stack {
     //   "QUEUE_URL": archiveQueue.queueUrl,
     // }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
 
-    // bucket.addEventNotification(
-    //   s3.EventType.OBJECT_CREATED_PUT,
-    //   new s3n.SqsDestination(converterQueue),
-    //   {
-    //     prefix: 'OriginalImages'
-    //   }
-    // )
-
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
       new s3n.SnsDestination(converterTopic),
@@ -171,9 +159,14 @@ export class HeicToJpgStack extends Stack {
       }
     )
 
+    const converterDLQ = new sqs.Queue(this, "ConverterDLQ", {
+      removalPolicy: RemovalPolicy.DESTROY
+    })
     // converterQueue.grantConsumeMessages(converterLambda)
     // converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
-    converterLambda.addEventSource(new SnsEventSource(converterTopic))
+    converterLambda.addEventSource(new SnsEventSource(converterTopic, {
+      deadLetterQueue: converterDLQ
+    }))
     // goConverterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
 
     const zipperLambda = createArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
@@ -213,7 +206,7 @@ export class HeicToJpgStack extends Stack {
       "REQUESTS_API_URL": requestsApi.url,
       "STATUS_API_URL": statusApi.url,
     })
-    
+
     const presignCanary = createArmLambda(this, "PresignCanaryLambda", canariesPath + '/pre-sign', {
       "REQUESTS_API_URL": requestsApi.url,
       "PRESIGN_API_URL": preSignApi.url,
