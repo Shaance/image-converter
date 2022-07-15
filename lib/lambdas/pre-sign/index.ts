@@ -1,11 +1,10 @@
-import { PreSignAPIGatewayProxyEvent } from './@types/PreSignEvent';
 import { 
   S3Client,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
-import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyEventQueryStringParameters, APIGatewayProxyResultV2 } from 'aws-lambda';
 import {
   DynamoDBClient,
   GetItemCommand,
@@ -30,7 +29,7 @@ function toExtension(fileName: string): string {
   return fileName.substring(fileName.lastIndexOf('.'))
 }
 
-function toLambdaOutput(statusCode: number, body: any) {
+function toLambdaOutput(statusCode: number, body: any): APIGatewayProxyResultV2 {
   return {
     statusCode,
     headers: {
@@ -121,7 +120,7 @@ async function validateRequest(queryParams: APIGatewayProxyEventQueryStringParam
   return
 }
 
-export const handler = async (event: PreSignAPIGatewayProxyEvent) =>  {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResultV2> => {
     console.log(event)
     const errOutput = await validateRequest(event.queryStringParameters!)
     const { fileName, requestId, targetMime } = event.queryStringParameters!;

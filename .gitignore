@@ -10,3 +10,5 @@ scripts/response*
 scripts/local-*
 .DS_Store
 !npm-install-recursive.js
+lib/lambdas/go-converter/main
+lib/lambdas/go-converter/main.zip
