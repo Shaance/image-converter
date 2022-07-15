@@ -226,7 +226,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
   }
   if (extension.toLowerCase() !== "heic") {
     console.log("Not heic file, skipping")
-    return
+    return Promise.resolve()
   }
   const requestId = key.split('/')[1]
 

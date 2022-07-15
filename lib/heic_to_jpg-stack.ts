@@ -145,11 +145,11 @@ export class HeicToJpgStack extends Stack {
       "QUEUE_URL": archiveQueue.queueUrl,
     }, Duration.seconds(30), 1024)
 
-    // const goConverterLambda = createArmLambda(this, "GoConverterLambda", lambdasPath + '/go-converter', {
-    //   "REGION": props?.env?.region as string,
-    //   "TABLE_NAME": table.tableName,
-    //   "QUEUE_URL": archiveQueue.queueUrl,
-    // }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
+    const goConverterLambda = createArmLambda(this, "GoConverterLambda", lambdasPath + '/go-converter', {
+      "REGION": props?.env?.region as string,
+      "TABLE_NAME": table.tableName,
+      "QUEUE_URL": archiveQueue.queueUrl,
+    }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
 
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
@@ -162,12 +162,14 @@ export class HeicToJpgStack extends Stack {
     const converterDLQ = new sqs.Queue(this, "ConverterDLQ", {
       removalPolicy: RemovalPolicy.DESTROY
     })
-    // converterQueue.grantConsumeMessages(converterLambda)
-    // converterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
+
     converterLambda.addEventSource(new SnsEventSource(converterTopic, {
       deadLetterQueue: converterDLQ
     }))
-    // goConverterLambda.addEventSource(new SqsEventSource(converterQueue, { batchSize: 1 }))
+
+    goConverterLambda.addEventSource(new SnsEventSource(converterTopic, {
+      deadLetterQueue: converterDLQ
+    }))
 
     const zipperLambda = createArmLambda(this, "ZipperLambda", lambdasPath + '/zipper', {
       "REGION": props?.env?.region as string,
