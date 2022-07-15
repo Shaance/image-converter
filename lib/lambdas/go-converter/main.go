@@ -2,30 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-lambda-go/events"
-    "log"
-    "encoding/json"
-    "os"
-    "github.com/aws/aws-lambda-go/lambdacontext"
+	// "github.com/aws/aws-lambda-go/lambdacontext"
+	"log"
+	// "os"
 )
 
-func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
-    log.Println(event)
-    // event
-	eventJson, _ := json.MarshalIndent(event, "", "  ")
-	log.Printf("EVENT: %s", eventJson)
-	// environment variables
-	log.Printf("REGION: %s", os.Getenv("AWS_REGION"))
-	log.Println("ALL ENV VARS:")
-	for _, element := range os.Environ() {
-		log.Println(element)
-	}
-	// request context
-	lc, _ := lambdacontext.FromContext(ctx)
-	log.Printf("REQUEST ID: %s", lc.AwsRequestID)
+func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
+	eventJson, _ := json.Marshal(event)
+	log.Printf("Event: %s", eventJson)
+    var s3Json events.S3Event
+    json.Unmarshal([]byte(event.Records[0].SNS.Message), &s3Json)
+    log.Printf("S3 Object key: %s", s3Json.Records[0].S3.Object.Key)
 
-	return "Hello from go", nil
+    return "ok", nil
 }
 
 func main() {

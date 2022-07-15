@@ -5,25 +5,27 @@
     "heic_to_jpg": "bin/heic_to_jpg.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:go && npm run zip",
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
     "deploy": "npm run build && npm run cdk deploy",
-    "install:deps": "node npm-install-recursive.js"
+    "install:deps": "node npm-install-recursive.js",
+    "build:go": "(cd ./lib/lambdas/go-converter && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go)",
+    "zip": "(cd ./lib/lambdas/go-converter && zip main.zip main)"
   },
   "devDependencies": {
     "@types/jest": "^27.5.2",
     "@types/node": "10.17.27",
     "@types/prettier": "2.6.0",
-    "aws-cdk": "2.31.1",
+    "aws-cdk": "2.32.0",
     "jest": "^27.5.1",
     "ts-jest": "^27.1.4",
     "ts-node": "^10.8.1",
     "typescript": "~3.9.7"
   },
   "dependencies": {
-    "aws-cdk-lib": "2.31.1",
+    "aws-cdk-lib": "2.32.0",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.21"
   }

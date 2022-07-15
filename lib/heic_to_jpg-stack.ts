@@ -145,18 +145,17 @@ export class HeicToJpgStack extends Stack {
       "QUEUE_URL": archiveQueue.queueUrl,
     }, Duration.seconds(30), 1024)
 
-
     const goConverterLambda = new lambda.Function(this, "GoConverterLambda", {
       runtime: lambda.Runtime.GO_1_X,
-      handler: 'index.handler',
+      handler: 'main',
       logRetention: logs.RetentionDays.ONE_DAY,
-      code: lambda.Code.fromAsset('/go-converter'),
+      code: lambda.Code.fromAsset(lambdasPath + '/go-converter'),
       timeout: Duration.seconds(10),
       memorySize: 512,
       environment: {
-      "REGION": props?.env?.region as string,
-      "TABLE_NAME": table.tableName,
-      "QUEUE_URL": archiveQueue.queueUrl,
+        "REGION": props?.env?.region as string,
+        "TABLE_NAME": table.tableName,
+        "QUEUE_URL": archiveQueue.queueUrl,
       }
     });
 

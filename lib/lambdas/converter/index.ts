@@ -1,4 +1,3 @@
-import { S3SNSEvent, S3EventRecordDetail, S3EventRecord } from "./@types/S3Event";
 import {
   S3Client,
   GetObjectCommand,
@@ -19,6 +18,7 @@ import {
 import  { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Readable } from "stream";
 import { add } from 'date-fns'
+import { SNSEvent, S3EventRecord } from "aws-lambda";
 
 const convert = require("heic-convert")
 
@@ -216,7 +216,7 @@ async function uploadConvertedFile(key: string, bucket: string, targetMime: stri
   await pushToQueue(updatedItem, bucket)
 }
 
-async function convertFromS3(record: S3EventRecordDetail) {
+async function convertFromS3(record: S3EventRecord["s3"]) {
   console.log(record)
   const bucket = record.bucket.name;
   const key = record.object.key;
@@ -249,7 +249,7 @@ async function convertFromS3(record: S3EventRecordDetail) {
   }
 }
 
-export const handler = async function (event: S3SNSEvent) {
+export const handler = async function (event: SNSEvent) {
   // batch size 1
   console.log(event)
   console.log(event.Records[0].Sns)
