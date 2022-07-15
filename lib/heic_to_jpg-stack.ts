@@ -146,7 +146,7 @@ export class HeicToJpgStack extends Stack {
     }, Duration.seconds(30), 1024)
 
 
-    const goConverterLambda = new lambda.Function(scope, "GoConverterLambda", {
+    const goConverterLambda = new lambda.Function(this, "GoConverterLambda", {
       runtime: lambda.Runtime.GO_1_X,
       handler: 'index.handler',
       logRetention: logs.RetentionDays.ONE_DAY,
