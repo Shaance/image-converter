@@ -94,16 +94,16 @@ function createImagesBucket(scope: Construct): s3.Bucket {
   });
 }
 
-function createArmLambda(scope: Construct, name: string, codePath: string, environment?: { [key: string]: string }, timeout = Duration.seconds(3), memorySize = 128, runtime = lambda.Runtime.NODEJS_16_X) {
+function createArmLambda(scope: Construct, name: string, codePath: string, environment?: { [key: string]: string }, timeout = Duration.seconds(3), memorySize = 128) {
   return new lambda.Function(scope, name, {
     architecture: lambda.Architecture.ARM_64,
+    runtime: lambda.Runtime.NODEJS_16_X,
     handler: 'index.handler',
     logRetention: logs.RetentionDays.ONE_DAY,
     code: lambda.Code.fromAsset(codePath),
     timeout,
     environment,
     memorySize,
-    runtime,
   });
 }
 
@@ -145,11 +145,20 @@ export class HeicToJpgStack extends Stack {
       "QUEUE_URL": archiveQueue.queueUrl,
     }, Duration.seconds(30), 1024)
 
-    const goConverterLambda = createArmLambda(this, "GoConverterLambda", lambdasPath + '/go-converter', {
+
+    const goConverterLambda = new lambda.Function(scope, "GoConverterLambda", {
+      runtime: lambda.Runtime.GO_1_X,
+      handler: 'index.handler',
+      logRetention: logs.RetentionDays.ONE_DAY,
+      code: lambda.Code.fromAsset('/go-converter'),
+      timeout: Duration.seconds(10),
+      memorySize: 512,
+      environment: {
       "REGION": props?.env?.region as string,
       "TABLE_NAME": table.tableName,
       "QUEUE_URL": archiveQueue.queueUrl,
-    }, Duration.seconds(30), 1024, lambda.Runtime.GO_1_X)
+      }
+    });
 
     bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED_PUT,
