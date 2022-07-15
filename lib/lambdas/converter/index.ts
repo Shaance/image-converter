@@ -169,6 +169,19 @@ function toNewKey(key: string, targetMime: string) {
     + '.' + extension;
 }
 
+function getFileExtension(fileName: string) {
+  if (!fileName) {
+    return undefined
+  }
+  const split = fileName.split('.')
+
+  if (split.length < 1) {
+    return undefined
+  }
+
+  return split.pop()
+}
+
 async function pushToQueue(item: UpdateItemOutput, bucketName: string) {
   const convertedFiles = item.Attributes?.convertedFiles.N!
   const nbFiles = item.Attributes?.nbFiles.N!
@@ -207,6 +220,14 @@ async function convertFromS3(record: S3EventRecordDetail) {
   console.log(record)
   const bucket = record.bucket.name;
   const key = record.object.key;
+  const extension = getFileExtension(key)
+  if (!extension) {
+    throw new Error("Can't convert files without extension")
+  }
+  if (extension.toLowerCase() !== "heic") {
+    console.log("Not heic file, skipping")
+    return
+  }
   const requestId = key.split('/')[1]
 
   try {
