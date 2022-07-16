@@ -185,6 +185,7 @@ export class HeicToJpgStack extends Stack {
     }, Duration.seconds(30), 2048)
 
     archiveQueue.grantSendMessages(converterLambda)
+    archiveQueue.grantSendMessages(goConverterLambda)
     archiveQueue.grantConsumeMessages(zipperLambda)
 
     // TODO DLQ
