@@ -9,8 +9,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/sunshineplan/imgconv"
 	"log"
 	"os"
 	"strings"
@@ -62,16 +64,62 @@ func getExtensionFromString(fileName string) (string, error) {
 	return splitted[length-1], nil
 }
 
-// func getS3Object(bucket, key string) {
+func getConvertedFileName(targetMime, originalName string) string {
+	tmp := strings.Split(targetMime, "/")
+	return fmt.Sprintf("%s.%s", originalName, tmp[len(tmp)-1])
+}
 
-// }
+func getFileNameFromKey(key string) string {
+	tmp := strings.Split(key, "/")
+	return tmp[len(tmp)-1]
+}
 
+func downloadKeyToFile(ctx context.Context, key, bucket, fileName string) (*os.File, error) {
+	fileFromS3, err := os.Create(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer fileFromS3.Close()
+
+	downloader := manager.NewDownloader(awsS3Client)
+	_, err = downloader.Download(ctx, fileFromS3, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+
+	return fileFromS3, err
+}
+
+func uploadToS3(ctx context.Context, key, bucket, fileName string) error {
+	fileToUpload, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer fileToUpload.Close()
+
+	uploader := manager.NewUploader(awsS3Client)
+	result, err := uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   fileToUpload,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Println("File Uploaded Successfully, URL : ", result.Location)
+
+	return nil
+}
+
+// TODO break this into 3 funcs - download - convert - upload
 func convertImage(ctx context.Context, entity events.S3Entity) error {
 	bucket := entity.Bucket.Name
 	key := entity.Object.Key
-	// requestId := strings.Split(key, "/")[1]
+	requestId := strings.Split(key, "/")[1]
 
-	// TODO update uploaded count
+	// TODO update uploaded coun
 	headObj, err := awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -82,9 +130,43 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	}
 
 	targetMime := headObj.Metadata["target-mime"]
-	originalName := headObj.Metadata["orignal-name"]
-
+	originalName := headObj.Metadata["original-name"]
 	log.Printf("targetMime %s, originalName %s\n", targetMime, originalName)
+	// TODO check targetMime (but should be done at pre-sign instead of here)
+	fileName := getFileNameFromKey(key)
+	convertedFileName := getConvertedFileName(targetMime, originalName)
+	log.Printf("fileName %s, convertedFileName %s\n", fileName, convertedFileName)
+	if _, err := downloadKeyToFile(ctx, key, bucket, fileName); err != nil {
+		log.Println("Error while downloading file")
+		return err
+	}
+
+	fileFromS3, err := imgconv.Open(fileName)
+	if err != nil {
+		return err
+	}
+	// use targetMime for target formnat
+	if err := imgconv.Save(convertedFileName, fileFromS3, &imgconv.FormatOption{Format: imgconv.JPEG}); err != nil {
+		log.Printf("Error while converting file")
+		return err
+	}
+
+	destKey := fmt.Sprintf("Converted/%s/%s", requestId, convertedFileName)
+	if err := uploadToS3(ctx, destKey, bucket, convertedFileName); err != nil {
+		log.Println("Error while uploading file")
+		return err
+	}
+
+	if err := os.Remove(fileName); err != nil {
+		log.Println("Error deleting original file from S3 on lambda disk")
+		return err
+	}
+
+	if err := os.Remove(convertedFileName); err != nil {
+		log.Println("Error deleting converted file on lambda disk")
+		return err
+	}
+
 	return nil
 }
 

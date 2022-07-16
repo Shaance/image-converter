@@ -12,3 +12,9 @@
 - unit tests
 - integ tests
 - shared layers for common code
+- maybe only change back to original-name at the archive step, does it really matter though? Maybe can keep original name all along
+- for optimistic locking instead of always doing exponential backoff
+  - try immediate retries
+  - if that fails, try with jitter delay
+  - if that fails, try with jitter + exponential backoff
+- make mime checks at presign instead at later stages
