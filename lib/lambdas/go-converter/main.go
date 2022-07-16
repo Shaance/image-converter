@@ -34,6 +34,9 @@ var validFormats = map[string]void{
 	"bmp":  member,
 }
 
+// lambda can only write in tmp
+const validPath = "/tmp"
+
 var awsS3Client *s3.Client
 var ddbClient *dynamodb.Client
 var region string
@@ -74,8 +77,8 @@ func getFileNameFromKey(key string) string {
 	return tmp[len(tmp)-1]
 }
 
-func downloadKeyToFile(ctx context.Context, key, bucket, fileName string) (*os.File, error) {
-	fileFromS3, err := os.Create(fileName)
+func downloadKeyToFile(ctx context.Context, key, bucket, pathToFile string) (*os.File, error) {
+	fileFromS3, err := os.Create(pathToFile)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +93,8 @@ func downloadKeyToFile(ctx context.Context, key, bucket, fileName string) (*os.F
 	return fileFromS3, err
 }
 
-func uploadToS3(ctx context.Context, key, bucket, fileName string) error {
-	fileToUpload, err := os.Open(fileName)
+func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
+	fileToUpload, err := os.Open(pathToFile)
 	if err != nil {
 		return err
 	}
@@ -136,33 +139,35 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	fileName := getFileNameFromKey(key)
 	convertedFileName := getConvertedFileName(targetMime, originalName)
 	log.Printf("fileName %s, convertedFileName %s\n", fileName, convertedFileName)
-	if _, err := downloadKeyToFile(ctx, key, bucket, fileName); err != nil {
+	originalFilePath := fmt.Sprintf("%s/%s", validPath, fileName)
+	if _, err := downloadKeyToFile(ctx, key, bucket, originalFilePath); err != nil {
 		log.Println("Error while downloading file")
 		return err
 	}
-
-	fileFromS3, err := imgconv.Open(fileName)
+	fileFromS3, err := imgconv.Open(originalFilePath)
 	if err != nil {
 		return err
 	}
+
+	convertedFilePath := fmt.Sprintf("%s/%s", validPath, convertedFileName)
 	// use targetMime for target formnat
-	if err := imgconv.Save(convertedFileName, fileFromS3, &imgconv.FormatOption{Format: imgconv.JPEG}); err != nil {
+	if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: imgconv.JPEG}); err != nil {
 		log.Printf("Error while converting file")
 		return err
 	}
 
 	destKey := fmt.Sprintf("Converted/%s/%s", requestId, convertedFileName)
-	if err := uploadToS3(ctx, destKey, bucket, convertedFileName); err != nil {
+	if err := uploadToS3(ctx, destKey, bucket, convertedFilePath); err != nil {
 		log.Println("Error while uploading file")
 		return err
 	}
 
-	if err := os.Remove(fileName); err != nil {
+	if err := os.Remove(originalFilePath); err != nil {
 		log.Println("Error deleting original file from S3 on lambda disk")
 		return err
 	}
 
-	if err := os.Remove(convertedFileName); err != nil {
+	if err := os.Remove(convertedFilePath); err != nil {
 		log.Println("Error deleting converted file on lambda disk")
 		return err
 	}
