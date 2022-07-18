@@ -109,15 +109,20 @@ func getExtensionFromString(fileName string) (string, error) {
 	return splitted[length-1], nil
 }
 
-func getConvertedFileName(targetMime, originalName string) string {
+func getConvertedFileName(targetMime, fileName string) string {
 	tmp := strings.Split(targetMime, "/")
-	return fmt.Sprintf("%s.%s", originalName, tmp[len(tmp)-1])
+	return fmt.Sprintf("%s.%s", fileName, tmp[len(tmp)-1])
 }
 
 func getFileNameFromKey(key string) string {
 	tmp := strings.Split(key, "/")
 	return tmp[len(tmp)-1]
 }
+
+// func replaceExtension(fileName, newExtension string) string {
+// 	tmp := strings.Split(fileName, ".")
+// 	return fmt.Sprintf("%s.%s", tmp[0], newExtension)
+// }
 
 func downloadKeyToFile(ctx context.Context, key, bucket, pathToFile string) (*os.File, error) {
 	fileFromS3, err := os.Create(pathToFile)
@@ -135,7 +140,7 @@ func downloadKeyToFile(ctx context.Context, key, bucket, pathToFile string) (*os
 	return fileFromS3, err
 }
 
-func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
+func uploadToS3(ctx context.Context, key, bucket, pathToFile, originalName string) error {
 	fileToUpload, err := os.Open(pathToFile)
 	if err != nil {
 		return err
@@ -148,6 +153,9 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
 		Key:     aws.String(key),
 		Body:    fileToUpload,
 		Expires: aws.Time(time.Now().Add(1 * time.Hour)),
+		Metadata: map[string]string{
+			"original-name": originalName,
+		},
 	}); err == nil {
 		log.Println("File Uploaded Successfully, URL : ", result.Location)
 	}
@@ -176,13 +184,13 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 		return err
 	}
 
-	sMInput := &sqs.SendMessageInput{
+	messageInput := &sqs.SendMessageInput{
 		DelaySeconds: 2,
 		MessageBody: aws.String(string(json)),
 		QueueUrl: &queueUrl,
 	}
 
-	_, err = sqsClient.SendMessage(ctx, sMInput)
+	_, err = sqsClient.SendMessage(ctx, messageInput)
 	if err != nil {
 		fmt.Println("Got an error sending the message:")
 		fmt.Println(err)
@@ -289,12 +297,10 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 		return err
 	}
 
-	// TODO update uploaded coun
 	targetMime := metadata["target-mime"]
 	originalName := metadata["original-name"]
-	convertedFileName := getConvertedFileName(targetMime, originalName)
 	fileName := getFileNameFromKey(key)
-
+	convertedFileName := getConvertedFileName(targetMime, fileName)
 	originalFilePath := fmt.Sprintf("%s/%s", validPath, fileName)
 	if _, err := downloadKeyToFile(ctx, key, bucket, originalFilePath); err != nil {
 		log.Println("Error while downloading file")
@@ -302,7 +308,6 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	}
 
 	// TODO check targetMime (but should be done at pre-sign instead of here)
-
 	fileFromS3, err := imgconv.Open(originalFilePath)
 	if err != nil {
 		return err
@@ -316,7 +321,7 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	}
 
 	destKey := fmt.Sprintf("Converted/%s/%s", requestId, convertedFileName)
-	if err := uploadToS3(ctx, destKey, bucket, convertedFilePath); err != nil {
+	if err := uploadToS3(ctx, destKey, bucket, convertedFilePath, originalName); err != nil {
 		log.Println("Error while uploading file")
 		return err
 	}

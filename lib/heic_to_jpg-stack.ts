@@ -151,7 +151,7 @@ export class HeicToJpgStack extends Stack {
       logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/go-converter'),
       timeout: Duration.seconds(10),
-      memorySize: 512,
+      memorySize: 256,
       environment: {
         "REGION": props?.env?.region as string,
         "TABLE_NAME": table.tableName,
