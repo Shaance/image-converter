@@ -34,8 +34,6 @@ type RequestItem struct {
 	NbFiles        int    `json:"nbFiles"`
 }
 
-type void struct{}
-
 type RetryMode int64
 
 type RetryState struct {
@@ -52,20 +50,17 @@ const (
 	Exponential // + jitter
 )
 
-var member void
-
 // can convert from / to these formats
-var validFormats = map[string]void{
-	"jpeg": member,
-	"jpg":  member,
-	"png":  member,
-	"gif":  member,
-	"tif":  member,
-	"tiff": member,
-	"pdf":  member,
-	"bmp":  member,
+var targetMimeToImgConvFormat = map[string]imgconv.Format{
+	"image/jpeg": imgconv.JPEG,
+	"image/jpg":  imgconv.JPEG,
+	"image/png":  imgconv.PNG,
+	"image/gif":  imgconv.GIF,
+	"image/tif":  imgconv.TIFF,
+	"image/tiff": imgconv.TIFF,
+	"image/bmp":  imgconv.BMP,
+	"image/pdf":  imgconv.PDF,
 }
-
 
 var awsS3Client *s3.Client
 var ddbClient *dynamodb.Client
@@ -118,11 +113,6 @@ func getFileNameFromKey(key string) string {
 	tmp := strings.Split(key, "/")
 	return tmp[len(tmp)-1]
 }
-
-// func replaceExtension(fileName, newExtension string) string {
-// 	tmp := strings.Split(fileName, ".")
-// 	return fmt.Sprintf("%s.%s", tmp[0], newExtension)
-// }
 
 func downloadKeyToFile(ctx context.Context, key, bucket, pathToFile string) (*os.File, error) {
 	fileFromS3, err := os.Create(pathToFile)
@@ -315,7 +305,7 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 
 	convertedFilePath := fmt.Sprintf("%s/%s", validPath, convertedFileName)
 	// use targetMime for target formnat
-	if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: imgconv.JPEG}); err != nil {
+	if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: targetMimeToImgConvFormat[targetMime]}); err != nil {
 		log.Printf("Error while converting file")
 		return err
 	}
@@ -370,7 +360,7 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 	if extension == "heic" {
 		log.Println("heic format, nothing to do")
 		return "ok", nil
-	} else if _, ok := validFormats[extension]; !ok {
+	} else if _, ok := targetMimeToImgConvFormat[extension]; !ok {
 		err := fmt.Errorf("%s format is unsupported", extension)
 		log.Println(err)
 		return "", err
