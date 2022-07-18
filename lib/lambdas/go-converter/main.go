@@ -21,6 +21,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/sunshineplan/imgconv"
 )
 
@@ -31,6 +33,7 @@ type RequestItem struct {
 	ModifiedAt     int    `json:"modifiedAt"`
 	State          string `json:"state"`
 	ConvertedFiles int    `json:"convertedFiles"`
+	NbFiles        int    `json:"nbFiles"`
 }
 
 var member void
@@ -52,6 +55,7 @@ const validPath = "/tmp"
 
 var awsS3Client *s3.Client
 var ddbClient *dynamodb.Client
+var sqsClient *sqs.Client
 var region string
 var queueUrl string
 var tableName string
@@ -93,6 +97,7 @@ func configClients() {
 	}
 	awsS3Client = s3.NewFromConfig(cfg)
 	ddbClient = dynamodb.NewFromConfig(cfg)
+	sqsClient = sqs.NewFromConfig(cfg)
 }
 
 func getExtensionFromString(fileName string) (string, error) {
@@ -139,12 +144,49 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
 
 	uploader := manager.NewUploader(awsS3Client)
 	if result, err := uploader.Upload(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-		Body:   fileToUpload,
+		Bucket:  aws.String(bucket),
+		Key:     aws.String(key),
+		Body:    fileToUpload,
 		Expires: aws.Time(time.Now().Add(1 * time.Hour)),
 	}); err == nil {
 		log.Println("File Uploaded Successfully, URL : ", result.Location)
+	}
+
+	return err
+}
+
+func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
+	convertedFiles := item.ConvertedFiles
+	nbFiles := item.NbFiles
+	requestId := item.RequestId
+	if convertedFiles != nbFiles {
+		return nil
+	}
+
+	prefix := fmt.Sprintf("Converted/%s", requestId)
+	sMInput := &sqs.SendMessageInput{
+		DelaySeconds: 2,
+		MessageAttributes: map[string]sqsTypes.MessageAttributeValue{
+			"requestId": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String(requestId),
+			},
+			"bucketName": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String(bucket),
+			},
+			"prefix": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String(prefix),
+			},
+		},
+		QueueUrl: &queueUrl,
+	}
+
+	_, err := sqsClient.SendMessage(ctx, sMInput)
+	if err != nil {
+		fmt.Println("Got an error sending the message:")
+		fmt.Println(err)
 	}
 
 	return err
@@ -281,14 +323,16 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	}
 
 	requestItem := RequestItem{}
-
 	resp, err := updateCount(ctx, requestId, "convertedFiles", types.ReturnValueAllNew, defaultRetryState)
 	if err != nil {
 		return err
 	}
 	attributevalue.UnmarshalMap(resp.Attributes, &requestItem)
 	log.Printf("ConvertedFiles %d\n", requestItem.ConvertedFiles)
-	// TODO push to Q
+
+	if err := pushToQueue(ctx, &requestItem, bucket); err != nil {
+		return err
+	}
 
 	if err := os.Remove(originalFilePath); err != nil {
 		log.Println("Error deleting original file from S3 on lambda disk")

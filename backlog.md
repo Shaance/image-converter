@@ -18,3 +18,4 @@
   - if that fails, try with jitter delay
   - if that fails, try with jitter + exponential backoff
 - make mime checks at presign instead at later stages
+- make golang lambda update state on failure

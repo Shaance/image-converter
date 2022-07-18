@@ -186,11 +186,11 @@ async function pushToQueue(item: UpdateItemOutput, bucketName: string) {
   const convertedFiles = item.Attributes?.convertedFiles.N!
   const nbFiles = item.Attributes?.nbFiles.N!
   const requestId = item.Attributes?.requestId.S!
-  const prefix = `Converted/${requestId}`
   if (convertedFiles !== nbFiles) {
     return
   }
-
+  
+  const prefix = `Converted/${requestId}`
   try {
     const params = {
       MessageBody: JSON.stringify({
