@@ -5,20 +5,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/sunshineplan/imgconv"
-	"log"
-	"os"
-	"strings"
 )
 
 type void struct{}
+
+type RequestItem struct {
+	RequestId      string `json:"requestId"`
+	ModifiedAt     int    `json:"modifiedAt"`
+	State          string `json:"state"`
+	ConvertedFiles int    `json:"convertedFiles"`
+}
 
 var member void
 
@@ -42,6 +55,30 @@ var ddbClient *dynamodb.Client
 var region string
 var queueUrl string
 var tableName string
+
+type RetryMode int64
+
+type RetryState struct {
+	retryMode   RetryMode
+	retriesLeft int8
+	delay       int16
+}
+
+const (
+	Initial RetryMode = iota // immediately retry
+	ConstantDelay
+	Exponential // + jitter
+)
+
+var defaultRetryState = RetryState{
+	retryMode:   Initial,
+	retriesLeft: 5, // TODO change back to 15, put to 5 for debug
+	delay:       0,
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func setEnvVars() {
 	region = os.Getenv("REGION")
@@ -116,34 +153,118 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
 	return nil
 }
 
+func getMetadata(ctx context.Context, bucket, key string) (map[string]string, error) {
+	headObj, err := awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return headObj.Metadata, nil
+}
+
+func getRequestItem(ctx context.Context, requestId, projectionExpression string) (*dynamodb.GetItemOutput, error) {
+	return ddbClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]types.AttributeValue{
+			"requestId": &types.AttributeValueMemberS{Value: requestId},
+		},
+		ProjectionExpression: &projectionExpression,
+		ConsistentRead:       aws.Bool(true),
+	})
+}
+
+func updateCount(ctx context.Context, requestId, countAttribute string, returnValues types.ReturnValue, retryState RetryState) (*dynamodb.UpdateItemOutput, error) {
+	if retryState.retriesLeft < 1 {
+		if retryState.retryMode == Exponential {
+			return nil, fmt.Errorf("could not update attribute %s after retries", countAttribute)
+		}
+		if retryState.retryMode == ConstantDelay {
+			retryState.retryMode = Exponential
+			retryState.delay = 25
+		} else {
+			retryState.retryMode = ConstantDelay
+			retryState.delay = 25
+		}
+		retryState.retriesLeft = defaultRetryState.retriesLeft
+		return updateCount(ctx, requestId, countAttribute, returnValues, retryState)
+	}
+
+	resp, err := getRequestItem(ctx, requestId, "modifiedAt")
+	if err != nil {
+		log.Println("Could not retrieve Request item")
+		return nil, err
+	}
+	requestItem := RequestItem{}
+	attributevalue.UnmarshalMap(resp.Item, &requestItem)
+	modifiedAt := requestItem.ModifiedAt
+	conditionExpression := "#updatedAt = :modifiedAtFromItem"
+	now := time.Now().Unix()
+
+	updated, err := ddbClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]types.AttributeValue{
+			"requestId": &types.AttributeValueMemberS{Value: requestId},
+		},
+		UpdateExpression: aws.String("ADD #currentCount :n SET #updatedAt = :newChangeMadeAt, #state = :state"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":n":                  &types.AttributeValueMemberN{Value: "1"},
+			":newChangeMadeAt":    &types.AttributeValueMemberN{Value: strconv.FormatInt(now, 10)},
+			":modifiedAtFromItem": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", modifiedAt)},
+			":state":              &types.AttributeValueMemberS{Value: "CONVERTING"},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#currentCount": countAttribute,
+			"#updatedAt":    "modifiedAt",
+			"#state":        "state",
+		},
+		ConditionExpression: &conditionExpression,
+		ReturnValues:        returnValues,
+	})
+
+	if err != nil {
+		log.Printf("%s\nRetries left %d, retry mode%d\n", err, retryState.retriesLeft, retryState.retryMode)
+		if retryState.retryMode == Exponential {
+			// TODO jitter
+			retryState.delay = 2 * retryState.delay
+		}
+
+		retryState.retriesLeft -= 1
+		time.Sleep(time.Duration(retryState.delay) * time.Millisecond)
+		return updateCount(ctx, requestId, countAttribute, returnValues, retryState)
+	}
+
+	return updated, nil
+}
+
 // TODO break this into 3 funcs - download - convert - upload
 func convertImage(ctx context.Context, entity events.S3Entity) error {
 	bucket := entity.Bucket.Name
 	key := entity.Object.Key
 	requestId := strings.Split(key, "/")[1]
-
-	// TODO update uploaded coun
-	headObj, err := awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-
+	if _, err := updateCount(ctx, requestId, "uploadedFiles", types.ReturnValueNone, defaultRetryState); err != nil {
+		return err
+	}
+	metadata, err := getMetadata(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
 
-	targetMime := headObj.Metadata["target-mime"]
-	originalName := headObj.Metadata["original-name"]
-	log.Printf("targetMime %s, originalName %s\n", targetMime, originalName)
-	// TODO check targetMime (but should be done at pre-sign instead of here)
-	fileName := getFileNameFromKey(key)
+	// TODO update uploaded coun
+	targetMime := metadata["target-mime"]
+	originalName := metadata["original-name"]
 	convertedFileName := getConvertedFileName(targetMime, originalName)
-	log.Printf("fileName %s, convertedFileName %s\n", fileName, convertedFileName)
+	fileName := getFileNameFromKey(key)
+
 	originalFilePath := fmt.Sprintf("%s/%s", validPath, fileName)
 	if _, err := downloadKeyToFile(ctx, key, bucket, originalFilePath); err != nil {
 		log.Println("Error while downloading file")
 		return err
 	}
+
+	// TODO check targetMime (but should be done at pre-sign instead of here)
+
 	fileFromS3, err := imgconv.Open(originalFilePath)
 	if err != nil {
 		return err
@@ -161,6 +282,16 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 		log.Println("Error while uploading file")
 		return err
 	}
+
+	requestItem := RequestItem{}
+
+	resp, err := updateCount(ctx, requestId, "convertedFiles", types.ReturnValueAllNew, defaultRetryState)
+	if err != nil {
+		return err
+	}
+	attributevalue.UnmarshalMap(resp.Attributes, &requestItem)
+	log.Printf("ConvertedFiles %d\n", requestItem.ConvertedFiles)
+	// TODO push to Q
 
 	if err := os.Remove(originalFilePath); err != nil {
 		log.Println("Error deleting original file from S3 on lambda disk")
@@ -200,7 +331,7 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 		return "", err
 	}
 	log.Printf("Source image extension: %s", extension)
-	// log.Println("Golang lambda image conversion not yet implemented!")
+	// log.Println("Golang lambda image conversion not yet implemented!"))
 	err = convertImage(ctx, s3Entity)
 	if err != nil {
 		log.Panicln(err)
