@@ -22,7 +22,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/sunshineplan/imgconv"
 )
 
@@ -165,27 +164,25 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 	}
 
 	prefix := fmt.Sprintf("Converted/%s", requestId)
+	params := map[string]string {
+		"requestId": requestId,
+		"bucketName": bucket,
+		"prefix": prefix,
+	}
+
+	json, err := json.Marshal(params)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	sMInput := &sqs.SendMessageInput{
 		DelaySeconds: 2,
-		MessageAttributes: map[string]sqsTypes.MessageAttributeValue{
-			"requestId": {
-				DataType:    aws.String("String"),
-				StringValue: aws.String(requestId),
-			},
-			"bucketName": {
-				DataType:    aws.String("String"),
-				StringValue: aws.String(bucket),
-			},
-			"prefix": {
-				DataType:    aws.String("String"),
-				StringValue: aws.String(prefix),
-			},
-		},
-		MessageBody: aws.String("Placeholder"),
+		MessageBody: aws.String(string(json)),
 		QueueUrl: &queueUrl,
 	}
 
-	_, err := sqsClient.SendMessage(ctx, sMInput)
+	_, err = sqsClient.SendMessage(ctx, sMInput)
 	if err != nil {
 		fmt.Println("Got an error sending the message:")
 		fmt.Println(err)
