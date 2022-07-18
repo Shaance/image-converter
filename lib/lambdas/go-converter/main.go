@@ -142,6 +142,7 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Body:   fileToUpload,
+		Expires: aws.Time(time.Now().Add(1 * time.Hour)),
 	}); err == nil {
 		log.Println("File Uploaded Successfully, URL : ", result.Location)
 	}
