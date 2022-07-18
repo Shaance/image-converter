@@ -26,7 +26,6 @@ import (
 	"github.com/sunshineplan/imgconv"
 )
 
-type void struct{}
 
 type RequestItem struct {
 	RequestId      string `json:"requestId"`
@@ -35,6 +34,24 @@ type RequestItem struct {
 	ConvertedFiles int    `json:"convertedFiles"`
 	NbFiles        int    `json:"nbFiles"`
 }
+
+type void struct{}
+
+type RetryMode int64
+
+type RetryState struct {
+	retryMode   RetryMode
+	retriesLeft int8
+	delay       int16
+}
+
+// lambda can only write in tmp
+const validPath = "/tmp"
+const (
+	Initial RetryMode = iota // immediately retry
+	ConstantDelay
+	Exponential // + jitter
+)
 
 var member void
 
@@ -50,8 +67,6 @@ var validFormats = map[string]void{
 	"bmp":  member,
 }
 
-// lambda can only write in tmp
-const validPath = "/tmp"
 
 var awsS3Client *s3.Client
 var ddbClient *dynamodb.Client
@@ -59,20 +74,6 @@ var sqsClient *sqs.Client
 var region string
 var queueUrl string
 var tableName string
-
-type RetryMode int64
-
-type RetryState struct {
-	retryMode   RetryMode
-	retriesLeft int8
-	delay       int16
-}
-
-const (
-	Initial RetryMode = iota // immediately retry
-	ConstantDelay
-	Exponential // + jitter
-)
 
 var defaultRetryState = RetryState{
 	retryMode:   Initial,
@@ -180,6 +181,7 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 				StringValue: aws.String(prefix),
 			},
 		},
+		MessageBody: aws.String("Placeholder"),
 		QueueUrl: &queueUrl,
 	}
 
