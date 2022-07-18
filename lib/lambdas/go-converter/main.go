@@ -138,19 +138,15 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile string) error {
 	defer fileToUpload.Close()
 
 	uploader := manager.NewUploader(awsS3Client)
-	result, err := uploader.Upload(ctx, &s3.PutObjectInput{
+	if result, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Body:   fileToUpload,
-	})
-
-	if err != nil {
-		return err
+	}); err == nil {
+		log.Println("File Uploaded Successfully, URL : ", result.Location)
 	}
 
-	log.Println("File Uploaded Successfully, URL : ", result.Location)
-
-	return nil
+	return err
 }
 
 func getMetadata(ctx context.Context, bucket, key string) (map[string]string, error) {
@@ -159,9 +155,9 @@ func getMetadata(ctx context.Context, bucket, key string) (map[string]string, er
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, err
+		log.Println("Error while getting metadata")
 	}
-	return headObj.Metadata, nil
+	return headObj.Metadata, err
 }
 
 func getRequestItem(ctx context.Context, requestId, projectionExpression string) (*dynamodb.GetItemOutput, error) {
