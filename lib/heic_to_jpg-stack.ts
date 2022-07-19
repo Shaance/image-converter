@@ -150,8 +150,7 @@ export class HeicToJpgStack extends Stack {
       handler: 'main',
       logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/go-converter'),
-      timeout: Duration.seconds(30),
-      memorySize: 256,
+      timeout: Duration.seconds(25), // GIF takes long time to convert
       environment: {
         "REGION": props?.env?.region as string,
         "TABLE_NAME": table.tableName,
