@@ -11,7 +11,7 @@
     "cdk": "cdk",
     "deploy": "npm run build && npm run cdk deploy",
     "install:deps": "node npm-install-recursive.js",
-    "build:go": "(cd ./lib/lambdas/go-converter && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go)",
+    "build:go": "(cd ./lib/lambdas/go-converter && go fmt && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go)",
     "zip": "(cd ./lib/lambdas/go-converter && zip main.zip main)"
   },
   "devDependencies": {

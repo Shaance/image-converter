@@ -25,7 +25,6 @@ import (
 	"github.com/sunshineplan/imgconv"
 )
 
-
 type RequestItem struct {
 	RequestId      string `json:"requestId"`
 	ModifiedAt     int    `json:"modifiedAt"`
@@ -162,10 +161,10 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 	}
 
 	prefix := fmt.Sprintf("Converted/%s", requestId)
-	params := map[string]string {
-		"requestId": requestId,
+	params := map[string]string{
+		"requestId":  requestId,
 		"bucketName": bucket,
-		"prefix": prefix,
+		"prefix":     prefix,
 	}
 
 	json, err := json.Marshal(params)
@@ -176,8 +175,8 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 
 	messageInput := &sqs.SendMessageInput{
 		DelaySeconds: 2,
-		MessageBody: aws.String(string(json)),
-		QueueUrl: &queueUrl,
+		MessageBody:  aws.String(string(json)),
+		QueueUrl:     &queueUrl,
 	}
 
 	_, err = sqsClient.SendMessage(ctx, messageInput)
