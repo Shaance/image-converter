@@ -148,7 +148,7 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile, originalName strin
 			"original-name": originalName,
 		},
 	}); err == nil {
-		log.Println("File Uploaded Successfully, URL : ", result.Location)
+		log.Println("File Uploaded Successfully, URL: ", result.Location)
 	}
 
 	return err
@@ -188,6 +188,24 @@ func pushToQueue(ctx context.Context, item *RequestItem, bucket string) error {
 	}
 
 	return err
+}
+
+func updateStatus(ctx context.Context, requestId, status string) (*dynamodb.UpdateItemOutput, error) {
+	return ddbClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]types.AttributeValue{
+			"requestId": &types.AttributeValueMemberS{Value: requestId},
+		},
+		UpdateExpression: aws.String("SET #updatedAt = :newChangeMadeAt, #state = :state"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":state":           &types.AttributeValueMemberS{Value: status},
+			":newChangeMadeAt": &types.AttributeValueMemberS{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		},
+		ExpressionAttributeNames: map[string]string{
+			"#updatedAt": "modifiedAt",
+			"#state":     "state",
+		},
+	})
 }
 
 func getMetadata(ctx context.Context, bucket, key string) (map[string]string, error) {
@@ -352,6 +370,7 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 	json.Unmarshal([]byte(event.Records[0].SNS.Message), &s3Json)
 	var s3Entity events.S3Entity = s3Json.Records[0].S3
 	key := s3Entity.Object.Key
+	requestId := strings.Split(key, "/")[1]
 	log.Printf("S3 Object key: %s", key)
 
 	extension, err := getExtensionFromString(key)
@@ -368,6 +387,7 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 	err = convertImage(ctx, s3Entity)
 	if err != nil {
 		log.Panicln(err)
+		updateStatus(ctx, requestId, "FAILED")
 		return "", err
 	}
 	return "ok", nil
