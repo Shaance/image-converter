@@ -18,9 +18,17 @@ import {
 const bucketName = process.env.BUCKET_NAME as string;
 const region = process.env.REGION as string;
 const tableName = process.env.TABLE_NAME as string;
-const validTargetMimes = ['image/jpeg', 'image/png', 'application/pdf'];
 const outOfRetries = "OutOfRetries"
 const maximumUrlGenerated = "MaxUrlReached"
+const validTargetMimes = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tif",
+  "image/tiff",
+  "image/bmp",
+  "application/pdf",
+];
 const validTargetMimesSet = new Set<string>(validTargetMimes);
 const ddbClient = new DynamoDBClient({ region });
 const s3Client = new S3Client({ region })
