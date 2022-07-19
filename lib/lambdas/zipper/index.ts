@@ -42,6 +42,7 @@ async function getObjectFrom(bucket: string, key: string): Promise<GetObjectComm
 }
 
 async function updateStatus(requestId: string, status: string): Promise<UpdateItemCommandOutput> {
+  const now = Math.floor(new Date().getTime() / 1000).toString()
   const params: UpdateItemCommandInput = {
     TableName: tableName,
     Key: {
@@ -53,7 +54,7 @@ async function updateStatus(requestId: string, status: string): Promise<UpdateIt
       "#state": "state",
     },
     ExpressionAttributeValues: {
-      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":newChangeMadeAt": { N: now },
       ":state": { S: status },
     },
   };

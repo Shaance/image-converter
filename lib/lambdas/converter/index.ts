@@ -59,6 +59,7 @@ async function getRequestItem(requestId: string, projectionExpression: string, c
 }
 
 async function updateStatus(requestId: string, status: string): Promise<UpdateItemCommandOutput> {
+  const now = Math.floor(new Date().getTime() / 1000).toString()
   const params: UpdateItemCommandInput = {
     TableName: tableName,
     Key: {
@@ -70,7 +71,7 @@ async function updateStatus(requestId: string, status: string): Promise<UpdateIt
       "#state" : "state",
     },
     ExpressionAttributeValues: {
-      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":newChangeMadeAt": { N: now },
       ":state": { S: status },
     },
   };
@@ -88,6 +89,7 @@ async function updateCount(requestId: string, countAttribute: string, returnValu
 
   const requestItem = (await getRequestItem(requestId, "modifiedAt")).Item
   const modifiedAt = requestItem?.modifiedAt.N
+  const now = Math.floor(new Date().getTime() / 1000).toString()
 
   const params: UpdateItemCommandInput = {
     TableName: tableName,
@@ -102,7 +104,7 @@ async function updateCount(requestId: string, countAttribute: string, returnValu
     },
     ExpressionAttributeValues: {
       ":n" : { N: "1" },
-      ":newChangeMadeAt": { N: new Date().getTime().toString() },
+      ":newChangeMadeAt": { N: now },
       ":modifiedAtFromItem": { N: modifiedAt as string },
       ":state": { S: "CONVERTING" },
     },
