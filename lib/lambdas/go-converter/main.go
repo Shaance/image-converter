@@ -51,14 +51,14 @@ const (
 
 // can convert from / to these formats
 var targetMimeToImgConvFormat = map[string]imgconv.Format{
-	"image/jpeg": imgconv.JPEG,
-	"image/jpg":  imgconv.JPEG,
-	"image/png":  imgconv.PNG,
-	"image/gif":  imgconv.GIF,
-	"image/tif":  imgconv.TIFF,
-	"image/tiff": imgconv.TIFF,
-	"image/bmp":  imgconv.BMP,
-	"image/pdf":  imgconv.PDF,
+	"image/jpeg":      imgconv.JPEG,
+	"image/jpg":       imgconv.JPEG,
+	"image/png":       imgconv.PNG,
+	"image/gif":       imgconv.GIF,
+	"image/tif":       imgconv.TIFF,
+	"image/tiff":      imgconv.TIFF,
+	"image/bmp":       imgconv.BMP,
+	"application/pdf": imgconv.PDF,
 }
 
 var awsS3Client *s3.Client
@@ -288,6 +288,11 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 
 	targetMime := metadata["target-mime"]
 	originalName := metadata["original-name"]
+
+	if _, ok := targetMimeToImgConvFormat[targetMime]; !ok {
+		return fmt.Errorf("%s format is unsupported", targetMime)
+	}
+
 	fileName := getFileNameFromKey(key)
 	convertedFileName := getConvertedFileName(targetMime, fileName)
 	originalFilePath := fmt.Sprintf("%s/%s", validPath, fileName)
@@ -359,11 +364,8 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 	if extension == "heic" {
 		log.Println("heic format, nothing to do")
 		return "ok", nil
-	} else if _, ok := targetMimeToImgConvFormat[extension]; !ok {
-		err := fmt.Errorf("%s format is unsupported", extension)
-		log.Println(err)
-		return "", err
 	}
+
 	log.Printf("Source image extension: %s", extension)
 	// log.Println("Golang lambda image conversion not yet implemented!"))
 	err = convertImage(ctx, s3Entity)
