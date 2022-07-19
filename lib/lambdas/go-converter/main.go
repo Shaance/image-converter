@@ -44,7 +44,7 @@ type RetryState struct {
 // lambda can only write in tmp
 const validPath = "/tmp"
 const (
-	Initial RetryMode = iota // immediately retry
+	Immediate RetryMode = iota
 	ConstantDelay
 	Exponential // + jitter
 )
@@ -69,13 +69,15 @@ var queueUrl string
 var tableName string
 
 var defaultRetryState = RetryState{
-	retryMode:   Initial,
-	retriesLeft: 5, // TODO change back to 15, put to 5 for debug
+	retryMode:   Immediate,
+	retriesLeft: 15,
 	delay:       0,
 }
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano()) // TODO jitter
+	setEnvVars()
+	configClients()
 }
 
 func setEnvVars() {
@@ -301,14 +303,12 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 		return err
 	}
 
-	// TODO check targetMime (but should be done at pre-sign instead of here)
 	fileFromS3, err := imgconv.Open(originalFilePath)
 	if err != nil {
 		return err
 	}
 
 	convertedFilePath := fmt.Sprintf("%s/%s", validPath, convertedFileName)
-	// use targetMime for target formnat
 	if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: targetMimeToImgConvFormat[targetMime]}); err != nil {
 		log.Printf("Error while converting file")
 		return err
@@ -346,8 +346,6 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 }
 
 func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
-	setEnvVars()
-	configClients()
 	eventJson, _ := json.Marshal(event)
 	log.Printf("Event: %s", eventJson)
 	var s3Json events.S3Event
@@ -367,7 +365,6 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 	}
 
 	log.Printf("Source image extension: %s", extension)
-	// log.Println("Golang lambda image conversion not yet implemented!"))
 	err = convertImage(ctx, s3Entity)
 	if err != nil {
 		log.Panicln(err)
