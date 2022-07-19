@@ -230,6 +230,15 @@ func getRequestItem(ctx context.Context, requestId, projectionExpression string)
 	})
 }
 
+func deleteObject(ctx context.Context, requestId, bucket, key string) (*dynamodb.DeleteItemOutput, error) {
+	return ddbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]types.AttributeValue{
+			"requestId": &types.AttributeValueMemberS{Value: requestId},
+		},
+	})
+}
+
 func updateCount(ctx context.Context, requestId, countAttribute string, returnValues types.ReturnValue, retryState RetryState) (*dynamodb.UpdateItemOutput, error) {
 	if retryState.retriesLeft < 1 {
 		if retryState.retryMode == Exponential {
@@ -390,7 +399,8 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 		updateStatus(ctx, requestId, "FAILED")
 		return "", err
 	}
-	return "ok", nil
+	_, err = deleteObject(ctx, requestId, s3Entity.Bucket.Name, key)
+	return "ok", err
 }
 
 func main() {
