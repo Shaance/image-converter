@@ -61,7 +61,7 @@ var targetMimeToImgConvFormat = map[string]imgconv.Format{
 	"application/pdf": imgconv.PDF,
 }
 
-var awsS3Client *s3.Client
+var s3Client *s3.Client
 var ddbClient *dynamodb.Client
 var sqsClient *sqs.Client
 var region string
@@ -91,7 +91,7 @@ func configClients() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	awsS3Client = s3.NewFromConfig(cfg)
+	s3Client = s3.NewFromConfig(cfg)
 	ddbClient = dynamodb.NewFromConfig(cfg)
 	sqsClient = sqs.NewFromConfig(cfg)
 }
@@ -122,7 +122,7 @@ func downloadKeyToFile(ctx context.Context, key, bucket, pathToFile string) (*os
 	}
 	defer fileFromS3.Close()
 
-	downloader := manager.NewDownloader(awsS3Client)
+	downloader := manager.NewDownloader(s3Client)
 	_, err = downloader.Download(ctx, fileFromS3, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -138,7 +138,7 @@ func uploadToS3(ctx context.Context, key, bucket, pathToFile, originalName strin
 	}
 	defer fileToUpload.Close()
 
-	uploader := manager.NewUploader(awsS3Client)
+	uploader := manager.NewUploader(s3Client)
 	if result, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:  aws.String(bucket),
 		Key:     aws.String(key),
@@ -209,7 +209,7 @@ func updateStatus(ctx context.Context, requestId, status string) (*dynamodb.Upda
 }
 
 func getMetadata(ctx context.Context, bucket, key string) (map[string]string, error) {
-	headObj, err := awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
+	headObj, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
@@ -230,12 +230,10 @@ func getRequestItem(ctx context.Context, requestId, projectionExpression string)
 	})
 }
 
-func deleteObject(ctx context.Context, requestId, bucket, key string) (*dynamodb.DeleteItemOutput, error) {
-	return ddbClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(tableName),
-		Key: map[string]types.AttributeValue{
-			"requestId": &types.AttributeValueMemberS{Value: requestId},
-		},
+func deleteObject(ctx context.Context, requestId, bucket, key string) (*s3.DeleteObjectOutput, error) {
+	return s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key: aws.String(key),
 	})
 }
 
@@ -399,7 +397,9 @@ func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
 		updateStatus(ctx, requestId, "FAILED")
 		return "", err
 	}
-	_, err = deleteObject(ctx, requestId, s3Entity.Bucket.Name, key)
+	if _, err = deleteObject(ctx, requestId, s3Entity.Bucket.Name, key); err != nil {
+		log.Println(err)
+	}
 	return "ok", err
 }
 
