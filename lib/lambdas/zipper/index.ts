@@ -6,6 +6,8 @@ import {
   ListObjectsV2CommandOutput,
   PutObjectCommandOutput,
   PutObjectCommand,
+  DeleteObjectCommandOutput,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import {
   DynamoDBClient,
@@ -89,6 +91,13 @@ async function putObjectTo(bucket: string, key: string, body: Buffer): Promise<P
   }))
 }
 
+async function deleteObject(bucket: string, key: string): Promise<DeleteObjectCommandOutput> {
+  return s3Client.send(new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  }))
+}
+
 async function addToZip(zip: JSZip, bucket: string, key: string) {
   const object = await getObjectFrom(bucket, key)
   const buffer = await toArrayBuffer(object.Body as Readable)
@@ -104,6 +113,13 @@ async function archive(bucket: string, prefix: string): Promise<Buffer> {
   return toArrayBuffer(zip.generateNodeStream())
 }
 
+async function deleteConvertedFiles(bucket: string, prefix: string) {
+  const listObjResult = await listObjects(bucket, prefix)
+  await Promise.all(listObjResult.Contents!!.map(content => {
+    deleteObject(bucket, content.Key as string)
+  }));
+}
+
 async function handleArchiveRequest(record: SQSRecord) {
   const recordBody = JSON.parse(record.body)
   console.log(recordBody)
@@ -113,6 +129,7 @@ async function handleArchiveRequest(record: SQSRecord) {
     const archiveBuffer = await archive(bucketName, prefix);
     const targetKey = `Archives/${requestId}/converted.zip`
     await putObjectTo(bucketName, targetKey, archiveBuffer);
+    await deleteConvertedFiles(bucketName, prefix)
     await updateStatus(requestId, "DONE")
   } catch (err) {
     await updateStatus(requestId, "FAILED")
