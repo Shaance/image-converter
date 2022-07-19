@@ -150,7 +150,7 @@ export class HeicToJpgStack extends Stack {
       handler: 'main',
       logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/go-converter'),
-      timeout: Duration.seconds(10),
+      timeout: Duration.seconds(30),
       memorySize: 256,
       environment: {
         "REGION": props?.env?.region as string,
