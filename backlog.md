@@ -17,5 +17,5 @@
   - try immediate retries
   - if that fails, try with jitter delay
   - if that fails, try with jitter + exponential backoff
-- immediately delete files
 - client, fix the dropdown not saving state
+- Jpg to png + jpg to gif extremely slow, doesn't finish in 50s, remove that option

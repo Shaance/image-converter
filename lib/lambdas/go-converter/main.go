@@ -233,7 +233,7 @@ func getRequestItem(ctx context.Context, requestId, projectionExpression string)
 func deleteObject(ctx context.Context, requestId, bucket, key string) (*s3.DeleteObjectOutput, error) {
 	return s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),
-		Key: aws.String(key),
+		Key:    aws.String(key),
 	})
 }
 

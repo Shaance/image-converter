@@ -150,12 +150,13 @@ export class HeicToJpgStack extends Stack {
       handler: 'main',
       logRetention: logs.RetentionDays.ONE_DAY,
       code: lambda.Code.fromAsset(lambdasPath + '/go-converter'),
-      timeout: Duration.seconds(25), // GIF takes long time to convert
+      timeout: Duration.seconds(20),
       environment: {
         "REGION": props?.env?.region as string,
         "TABLE_NAME": table.tableName,
         "QUEUE_URL": archiveQueue.queueUrl,
-      }
+      },
+      memorySize: 128
     });
 
     bucket.addEventNotification(
