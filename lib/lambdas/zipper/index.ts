@@ -115,9 +115,9 @@ async function archive(bucket: string, prefix: string): Promise<Buffer> {
 
 async function deleteConvertedFiles(bucket: string, prefix: string) {
   const listObjResult = await listObjects(bucket, prefix)
-  await Promise.all(listObjResult.Contents!!.map(content => {
+  await Promise.all(listObjResult.Contents!!.map(content => 
     deleteObject(bucket, content.Key as string)
-  }));
+  ));
 }
 
 async function handleArchiveRequest(record: SQSRecord) {
