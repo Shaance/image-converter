@@ -4,6 +4,8 @@ import {
   PutObjectCommand,
   PutObjectCommandOutput,
   GetObjectCommandOutput,
+  DeleteObjectCommandOutput,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import {
   DynamoDBClient,
@@ -154,6 +156,13 @@ async function putObjectTo(bucket: string, key: string, body: Buffer, originalNa
   }))
 }
 
+async function deleteObject(bucket: string, key: string): Promise<DeleteObjectCommandOutput> {
+  return s3Client.send(new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  }))
+}
+
 async function toArrayBuffer(stream: Readable): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -245,6 +254,7 @@ async function convertFromS3(record: S3EventRecord["s3"]) {
       quality: 1
     });
     await uploadConvertedFile(key, bucket, targetMime, requestId, originalName, outputBuffer)
+    await deleteObject(bucket, key) // don't need original file anymore
   } catch (err) {
     await updateStatus(requestId, "FAILED")
     throw err
