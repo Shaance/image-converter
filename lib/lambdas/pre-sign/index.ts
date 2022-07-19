@@ -24,6 +24,7 @@ const validTargetMimes = [
   "image/jpeg",
   "image/jpg",
   "image/png",
+  "image/gif",
   "image/tif",
   "image/tiff",
   "image/bmp",
