@@ -51,7 +51,8 @@ function validateRequest(nbFiles: string) {
 async function createRequestItem(event: APIGatewayProxyEvent, requestId: string) {
   const nbFiles = event.queryStringParameters!.nbFiles as string
   const sourceIP = event.requestContext.identity.sourceIp
-  const now = new Date().getTime().toString()
+  const now = Math.floor(new Date().getTime() / 1000).toString()
+  const expiresAt = Math.floor(add(new Date(), { days: 2 }).getTime() / 1000) // must be in seconds
   const params = {
     TableName: tableName,
     Item: {
@@ -63,7 +64,7 @@ async function createRequestItem(event: APIGatewayProxyEvent, requestId: string)
       state: { S: "CREATED" },
       createdAt: { N: now },
       modifiedAt: { N: now },
-      expiresAt: { N: add(new Date(), { days: 2 }).getTime().toString()},
+      expiresAt: { N: expiresAt.toString()},
       sourceIP: { S: sourceIP }
     },
   };

@@ -79,7 +79,7 @@ function addMethodOnGatewayApi(scope: Construct, lambdaFn: IFunction, api: Lambd
 }
 
 function createImagesBucket(scope: Construct): s3.Bucket {
-  return new s3.Bucket(scope, 'HeicToJpgBucket', {
+  return new s3.Bucket(scope, 'ImagesBucket', {
     enforceSSL: true,
     autoDeleteObjects: true,
     removalPolicy: RemovalPolicy.DESTROY,
