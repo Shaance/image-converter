@@ -18,4 +18,4 @@
   - if that fails, try with jitter delay
   - if that fails, try with jitter + exponential backoff
 - client, fix the dropdown not saving state
-- Jpg to png + jpg to gif extremely slow, doesn't finish in 50s, remove that option
+- Jpg to png + jpg to gif extremely slow, doesn't finish in 50s, remove that option, block at presign

@@ -106,8 +106,7 @@ func getExtensionFromString(fileName string) (string, error) {
 }
 
 func getConvertedFileName(targetMime, fileName string) string {
-	tmp := strings.Split(targetMime, "/")
-	return fmt.Sprintf("%s.%s", fileName, tmp[len(tmp)-1])
+	return fmt.Sprintf("%s.%s", strings.Split(fileName, ".")[0], strings.Split(targetMime, "/")[1])
 }
 
 func getFileNameFromKey(key string) string {
@@ -323,20 +322,28 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 	fileName := getFileNameFromKey(key)
 	convertedFileName := getConvertedFileName(targetMime, fileName)
 	originalFilePath := fmt.Sprintf("%s/%s", validPath, fileName)
+	convertedFilePath := fmt.Sprintf("%s/%s", validPath, convertedFileName)
+
 	if _, err := downloadKeyToFile(ctx, key, bucket, originalFilePath); err != nil {
 		log.Println("Error while downloading file")
 		return err
 	}
+	defer os.Remove(originalFilePath)
 
-	fileFromS3, err := imgconv.Open(originalFilePath)
-	if err != nil {
-		return err
-	}
+	log.Printf("fileName: %s, convertedFileName: %s\n", fileName, convertedFileName)
+	if convertedFileName != fileName {
+		fileFromS3, err := imgconv.Open(originalFilePath)
+		if err != nil {
+			return err
+		}
 
-	convertedFilePath := fmt.Sprintf("%s/%s", validPath, convertedFileName)
-	if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: targetMimeToImgConvFormat[targetMime]}); err != nil {
-		log.Printf("Error while converting file")
-		return err
+		if err := imgconv.Save(convertedFilePath, fileFromS3, &imgconv.FormatOption{Format: targetMimeToImgConvFormat[targetMime]}); err != nil {
+			log.Printf("Error while converting file")
+			return err
+		}
+		defer os.Remove(convertedFilePath)
+	} else {
+		log.Println("No conversion needed")
 	}
 
 	destKey := fmt.Sprintf("Converted/%s/%s", requestId, convertedFileName)
@@ -351,23 +358,7 @@ func convertImage(ctx context.Context, entity events.S3Entity) error {
 		return err
 	}
 	attributevalue.UnmarshalMap(resp.Attributes, &requestItem)
-	log.Printf("ConvertedFiles %d\n", requestItem.ConvertedFiles)
-
-	if err := pushToQueue(ctx, &requestItem, bucket); err != nil {
-		return err
-	}
-
-	if err := os.Remove(originalFilePath); err != nil {
-		log.Println("Error deleting original file from S3 on lambda disk")
-		return err
-	}
-
-	if err := os.Remove(convertedFilePath); err != nil {
-		log.Println("Error deleting converted file on lambda disk")
-		return err
-	}
-
-	return nil
+	return pushToQueue(ctx, &requestItem, bucket)
 }
 
 func HandleRequest(ctx context.Context, event events.SNSEvent) (string, error) {
