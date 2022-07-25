@@ -1,9 +1,10 @@
-```
-aws lambda invoke \
-    --function-name HeicToJpgStack-PreSignLambda281BAB7C-0RCZ89sMddBU \
-    --cli-binary-format raw-in-base64-out \
-    --payload file://local-pre-sign-event.json \
-    --log-type Tail response.json \
-    | grep "LogResult"| awk -F'"' '{print $4}' | base64 --decode > response-pre-sign.log
+# Image conversion: AWS infrastructure
 
-```
+## Description
+This repo contains an AWS infrastructure managed through CDK framework as well as lambda functions (node16 + go1.x) aimed to do image conversion.
+
+## High level design
+TODO
+
+## Example client
+TODO add link
