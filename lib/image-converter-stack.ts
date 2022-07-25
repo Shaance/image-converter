@@ -115,7 +115,7 @@ function createCanaryRule(scope: Construct, functions: lambda.Function[]) {
   });
 }
 
-export class HeicToJpgStack extends Stack {
+export class ImageConverterStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
