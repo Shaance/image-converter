@@ -107,6 +107,14 @@ function createArmLambda(scope: Construct, name: string, codePath: string, envir
   });
 }
 
+function createCanaryRule(scope: Construct, functions: lambda.Function[]) {
+  functions.map(f => new LambdaFunction(f))
+  return new Rule(scope, 'CanaryRule', {
+    schedule: Schedule.rate(Duration.minutes(1)),
+    targets: functions.map(f => new LambdaFunction(f)),
+  });
+}
+
 export class HeicToJpgStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -225,13 +233,6 @@ export class HeicToJpgStack extends Stack {
       "PRESIGN_API_URL": preSignApi.url,
     })
 
-    new Rule(this, 'CanaryRule', {
-      schedule: Schedule.rate(Duration.minutes(1)),
-      targets: [
-        new LambdaFunction(requestCanary),
-        new LambdaFunction(statusCanary),
-        new LambdaFunction(presignCanary),
-      ],
-    });
+    createCanaryRule(this, [requestCanary, statusCanary, presignCanary])
   }
 }
