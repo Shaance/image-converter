@@ -1,8 +1,8 @@
 {
-  "name": "heic_to_jpg",
+  "name": "image_converter",
   "version": "0.1.0",
   "bin": {
-    "heic_to_jpg": "bin/heic_to_jpg.js"
+    "image-converter": "bin/image-converter.js"
   },
   "scripts": {
     "build": "tsc && npm run build:go && npm run zip",
