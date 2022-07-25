@@ -1,7 +1,7 @@
-# Image conversion: AWS infrastructure
+# Image conversion
 
 ## Description
-This repo contains an AWS infrastructure managed through CDK framework as well as lambda functions (node16 + go1.x) aimed to do image conversion.
+This repo contains an AWS infrastructure managed through [CDK](https://aws.amazon.com/cdk/) framework as well as lambda functions (node16 + go1.x) aimed to do image conversion.
 
 ## Supported formats
 From [heic](https://www.adobe.com/creativecloud/file-types/image/raster/heic-file.html) to
