@@ -35,3 +35,8 @@
 ## Some conversions are too expensive
 - Jpg to png + jpg to gif extremely slow, doesn't finish in 50s
 - either remove that option by blocking at presign or maybe try another lib
+
+
+## AWS region
+- Right now hardcoded for eu-west-1
+- Make it generic instead
