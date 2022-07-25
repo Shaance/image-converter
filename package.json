@@ -1,5 +1,8 @@
 {
   "name": "image_converter",
+  "author": {
+    "name": "Christophe Ha"
+  },
   "version": "0.1.0",
   "bin": {
     "image-converter": "bin/image-converter.js"
