@@ -30,7 +30,8 @@
 - We only put the original name back when building the archive
 
 ## Alarms
-- Create alarms based on latency, faults metrics
+- Create alarms based on latency, faults, DLQ not empty metrics
 
 ## Some conversions are too expensive
-- Jpg to png + jpg to gif extremely slow, doesn't finish in 50s, remove that option, block at presign
+- Jpg to png + jpg to gif extremely slow, doesn't finish in 50s
+- either remove that option by blocking at presign or maybe try another lib
