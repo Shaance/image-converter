@@ -12,3 +12,4 @@ scripts/local-*
 !npm-install-recursive.js
 lib/lambdas/go-converter/main
 lib/lambdas/go-converter/main.zip
+tmp
