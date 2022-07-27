@@ -4,11 +4,11 @@
 This repo contains code to deploy an AWS infrastructure managed through [CDK](https://aws.amazon.com/cdk/) framework as well as lambda functions (node16 + go1.x) aimed to do image conversion.
 
 ## Supported formats
-From [heic](https://www.adobe.com/creativecloud/file-types/image/raster/heic-file.html) to
+From [heic](https://www.adobe.com/creativecloud/file-types/image/raster/heic-file.html) to:
 - JPG
 - PNG
 
-From any to any of these:
+From any to any of these formats:
 - JPEG
 - PNG
 - PDF
@@ -18,7 +18,11 @@ From any to any of these:
 
 
 ## High level design diagram
-TODO
+1. Create the request
+![Request diagram](/images/Request.jpg)
+
+2. Get pre-signed url to upload images on S3
+![Presign diagram](/images/Presign.jpg)
 
 ## API descriptions
 
