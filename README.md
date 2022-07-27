@@ -17,12 +17,15 @@ From any to any of these formats:
 - BMP
 
 
-## High level design diagram
+## High level design diagrams (WIP)
 1. Create the request
 ![Request diagram](/images/Request.jpg)
 
 2. Get pre-signed url to upload images on S3
 ![Presign diagram](/images/Presign.jpg)
+
+3. Images upload, conversion and archive
+
 
 ## API descriptions
 
