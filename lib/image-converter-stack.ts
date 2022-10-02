@@ -110,7 +110,7 @@ function createArmLambda(scope: Construct, name: string, codePath: string, envir
 function createCanaryRule(scope: Construct, functions: lambda.Function[]) {
   functions.map(f => new LambdaFunction(f))
   return new Rule(scope, 'CanaryRule', {
-    schedule: Schedule.rate(Duration.minutes(1)),
+    schedule: Schedule.rate(Duration.minutes(5)),
     targets: functions.map(f => new LambdaFunction(f)),
   });
 }
