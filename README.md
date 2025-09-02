@@ -43,3 +43,6 @@ Some format conversions are very slow and will timeout:
 ## Example client
 - [App link](https://images.hashcode.dev/)
 - [Repo link](https://github.com/Shaance/image-converter-client)
+
+
+<!-- Security scan triggered at 2025-09-02 03:23:09 -->
